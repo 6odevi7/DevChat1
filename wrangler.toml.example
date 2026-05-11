@@ -1,0 +1,7 @@
+name = "devchat"
+pages_build_output_dir = "."
+compatibility_date = "2026-05-11"
+
+[[kv_namespaces]]
+binding = "DEVCHAT_KV"
+id = "replace-with-your-kv-namespace-id"

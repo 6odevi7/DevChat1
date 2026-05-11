@@ -1,0 +1,14 @@
+/api*
+  Cache-Control: no-store
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, POST, OPTIONS
+  Access-Control-Allow-Headers: Content-Type
+
+/*.html
+  Cache-Control: no-cache
+
+/app.js
+  Cache-Control: no-cache
+
+/styles.css
+  Cache-Control: no-cache

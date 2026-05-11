@@ -1,0 +1,23 @@
+# Force the web server to execute api.php (and any other .php files in this
+# folder) as PHP. Without this, some Hostinger / LiteSpeed configurations
+# serve api.php as a plain text file, which breaks signup/login.
+
+# LiteSpeed / Apache: set PHP handler for this directory.
+<FilesMatch "\.php$">
+    SetHandler application/x-httpd-php
+</FilesMatch>
+
+# Alternative handler some hosts require (commented out — uncomment if the
+# SetHandler line above doesn't work):
+# AddHandler application/x-httpd-php82 .php
+# AddType application/x-httpd-php .php
+
+# Make sure the API isn't cached by intermediaries.
+<IfModule mod_headers.c>
+    <FilesMatch "api\.php$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
+# Don't list directory contents.
+Options -Indexes

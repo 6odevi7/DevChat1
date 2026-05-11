@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevChat</title>
+  <meta name="description" content="DevChat connects developers and employers through live chat, posts, profiles, private rooms, and calls.">
+  <link rel="stylesheet" href="styles.css?v=2">
+  <script src="https://cdn.scaledrone.com/scaledrone.min.js" defer></script>
+  <script>
+    window.DEVCHAT_CONFIG = window.DEVCHAT_CONFIG || {
+      backend: "cloudflare",
+      apiUrl: "/api",
+      requireBackend: true,
+      // iceServers: [{ urls: "turn:turn.example.com:3478", username: "user", credential: "pass" }]
+    };
+  </script>
+  <script src="app.js?v=21" defer></script>
+</head>
+<body>
+  <main class="shell" id="app">
+    <section class="intro-panel" id="landing">
+      <div class="intro-copy">
+        <p class="signal">DevChat // live network</p>
+        <h1>DevChat</h1>
+        <p class="tagline">The free way to connect developers and employers.</p>
+        <p class="intro-text">Scan the lobby, view posts, preview portfolios, create jobseeker or hiring posts, and jump into private rooms with chat, file sharing, and video calls.</p>
+        <div class="intro-actions">
+          <button class="primary" id="enterDevChat" type="button">Enter DevChat</button>
+          <button class="ghost" data-open-auth="signup" type="button">Create Account</button>
+        </div>
+      </div>
+      <div class="terminal-preview" aria-label="DevChat preview">
+        <div class="terminal-bar"><span></span><span></span><span></span></div>
+        <pre id="bootLog">booting devchat...
+loading lobby stream...
+link preview parser ready
+private room bridge online
+ad billboard armed</pre>
+      </div>
+    </section>
+
+    <section class="profile-page is-hidden" id="profilePage" aria-label="DevChat profile">
+      <header class="topbar">
+        <div>
+          <p class="signal">/profile</p>
+          <h2 id="profilePageTitle">DevChat profile</h2>
+        </div>
+        <div class="session-card">
+          <a class="tiny ghost" href="DevChat.html">← Back to DevChat</a>
+        </div>
+      </header>
+      <section class="profile-grid">
+        <aside class="panel profile-summary">
+          <div class="panel-head"><h3>Identity</h3></div>
+          <div class="profile-card" id="profileSummary"></div>
+        </aside>
+        <section class="panel profile-posts">
+          <div class="panel-head"><h3>Posts</h3></div>
+          <div class="posts" id="profilePosts"></div>
+        </section>
+      </section>
+    </section>
+
+    <section class="workspace is-hidden" id="workspace" aria-label="DevChat workspace">
+      <header class="topbar">
+        <div>
+          <p class="signal">/DevChat</p>
+          <h2>Developer and employer exchange</h2>
+        </div>
+        <div class="session-card" id="sessionCard">
+          <span id="sessionName">Guest viewer</span>
+          <small id="sessionPhone">Sign up to message</small>
+          <button class="tiny" data-open-auth="signup" type="button">Sign up</button>
+          <button class="tiny ghost" data-open-auth="login" type="button">Login</button>
+        </div>
+      </header>
+
+      <section class="dashboard">
+        <aside class="panel feed-panel">
+          <div class="panel-head">
+            <h3>Posts</h3>
+            <button class="icon-button" id="newPostButton" type="button" title="New post">+</button>
+          </div>
+          <div class="post-form is-hidden" id="postForm">
+            <input id="postTitle" maxlength="72" placeholder="Title">
+            <textarea id="postDescription" rows="4" placeholder="Job description, availability, or request"></textarea>
+            <div class="form-row">
+              <select id="postType">
+                <option value="jobseeking">Jobseeking</option>
+                <option value="hiring">Hiring</option>
+              </select>
+              <input id="postPrice" maxlength="32" placeholder="Price / rate">
+            </div>
+            <button class="primary stretch" id="publishPost" type="button">Publish Post</button>
+          </div>
+          <div class="posts" id="posts"></div>
+        </aside>
+
+        <section class="panel chat-panel" aria-label="Lobby chat">
+          <div class="panel-head">
+            <div>
+              <h3>Lobby Chat</h3>
+              <small id="lobbyStatus">Local preview stream</small>
+            </div>
+            <button class="icon-button" id="openWidget" type="button" title="Open widget">▣</button>
+          </div>
+          <div class="messages" id="lobbyMessages" aria-live="polite"></div>
+          <div class="composer">
+            <label class="upload-button" title="Attach file">
+              <input id="fileUpload" type="file">
+              <span>⇧</span>
+            </label>
+            <input id="messageInput" placeholder="Sign up or login to send a message">
+            <button class="primary" id="sendMessage" type="button">Send</button>
+          </div>
+        </section>
+
+        <aside class="panel side-panel">
+          <div class="panel-head">
+            <h3>Private Room</h3>
+            <button class="icon-button" id="copyRoom" type="button" title="Copy room URL">⧉</button>
+          </div>
+          <div class="room-card">
+            <label for="phoneTarget">Phone ID</label>
+            <div class="form-row">
+              <input id="phoneTarget" placeholder="#0000000">
+              <button class="primary" id="callPhone" type="button" title="Call">☎</button>
+            </div>
+            <small id="roomUrl"></small>
+          </div>
+          <div class="video-frame">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <video id="localVideo" autoplay muted playsinline></video>
+            <div class="video-controls">
+              <button id="startCall" type="button">Start</button>
+              <button id="muteAudio" type="button">Mic</button>
+              <button id="muteVideo" type="button">Cam</button>
+            </div>
+          </div>
+          <div class="profile-card" id="profileCard"></div>
+        </aside>
+      </section>
+    </section>
+  </main>
+
+  <button class="widget-launcher" id="widgetLauncher" type="button" aria-label="Open DevChat widget">DC</button>
+  <section class="chat-widget is-hidden" id="chatWidget" aria-label="DevChat widget">
+    <div class="widget-head">
+      <strong>DevChat</strong>
+      <div>
+        <button class="icon-button" id="minimizeWidget" type="button" title="Minimize">−</button>
+        <button class="icon-button" id="closeWidget" type="button" title="Close">×</button>
+      </div>
+    </div>
+    <div class="widget-tabs">
+      <button class="active" data-widget-tab="chat" type="button">Chat</button>
+      <button data-widget-tab="posts" type="button">Posts</button>
+      <button data-widget-tab="room" type="button">Room</button>
+    </div>
+    <div class="widget-body" id="widgetBody"></div>
+  </section>
+
+  <iframe class="ad-billboard" title="DevChat ad billboard" src="ad-player.html" loading="lazy"></iframe>
+
+  <dialog class="auth-modal" id="authModal">
+    <form method="dialog">
+      <div class="panel-head">
+        <h3 id="authTitle">Create Account</h3>
+        <button class="icon-button" value="cancel" type="submit">×</button>
+      </div>
+      <div class="auth-tabs">
+        <button class="active" data-auth-tab="signup" type="button">Sign up</button>
+        <button data-auth-tab="login" type="button">Login</button>
+        <button data-auth-tab="reset" type="button">Reset</button>
+      </div>
+      <div class="auth-pane" id="signupPane">
+        <input id="signupUsername" placeholder="Username" autocomplete="username">
+        <input id="signupRealName" placeholder="Real name" autocomplete="name">
+        <input id="signupEmail" placeholder="Email" autocomplete="email">
+        <input id="signupPhone" placeholder="Best phone number" autocomplete="tel">
+        <button class="primary stretch" id="signupButton" type="button">Create DevChat ID</button>
+      </div>
+      <div class="auth-pane is-hidden" id="loginPane">
+        <input id="loginUsername" placeholder="Username or email" autocomplete="username">
+        <button class="primary stretch" id="loginButton" type="button">Login</button>
+      </div>
+      <div class="auth-pane is-hidden" id="resetPane">
+        <input id="resetEmail" placeholder="Account email" autocomplete="email">
+        <button class="primary stretch" id="resetButton" type="button">Generate Reset Link</button>
+      </div>
+      <p class="modal-note" id="authNote">DevChat requires the live /api backend.</p>
+    </form>
+  </dialog>
+
+  <dialog class="auth-modal" id="callModal">
+    <form method="dialog">
+      <div class="panel-head">
+        <h3 id="callModalTitle">Incoming call</h3>
+        <button class="icon-button" value="cancel" type="submit">×</button>
+      </div>
+      <div class="auth-pane">
+        <p class="modal-note" id="callModalBody">Someone is calling you on DevChat.</p>
+        <div class="form-row">
+          <button class="primary stretch" id="callAccept" type="button">Accept</button>
+          <button class="ghost stretch" id="callDecline" type="button">Decline</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="link-modal" id="linkModal">
+    <form method="dialog">
+      <div class="panel-head">
+        <h3 id="linkTitle">Preview</h3>
+        <button class="icon-button" value="cancel" type="submit">×</button>
+      </div>
+      <iframe id="linkFrame" title="DevChat link preview" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+      <a id="linkOpen" target="_blank" rel="noopener">Open in new tab</a>
+    </form>
+  </dialog>
+</body>
+</html>

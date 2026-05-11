@@ -1,0 +1,14 @@
+{
+  "name": "devchat-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node --check app.js && node --check _worker.js",
+    "check": "node --check app.js && node --check _worker.js",
+    "dev:cloudflare": "wrangler dev",
+    "deploy:cloudflare": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

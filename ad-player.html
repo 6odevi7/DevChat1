@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevChat Ad Player</title>
+  <link rel="stylesheet" href="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.css">
+  <script src="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.js"></script>
+  <script src="youtube-autoplay.js" defer></script>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #d9ffe9;
+      font-family: "Segoe UI", Arial, sans-serif;
+      overflow: hidden;
+    }
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border: 1px solid #1e3b32;
+      background: #000;
+    }
+    .stage video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+    .fluid_video_wrapper,
+    .fluid_video_wrapper.fluid_player_layout_default {
+      width: 100% !important;
+      height: 100% !important;
+      padding: 0 !important;
+    }
+    .fallback {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      text-align: center;
+      background: radial-gradient(circle at center, rgba(53,255,138,.18), #000 68%);
+      z-index: 1;
+    }
+    .fallback a {
+      color: #35ff8a;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .label {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      z-index: 5;
+      padding: 3px 6px;
+      border-radius: 4px;
+      background: rgba(0,0,0,.7);
+      color: #40d9ff;
+      font-size: 11px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <span class="label">AD</span>
+    <div class="fallback" id="fallback">
+      <a href="https://publishers.clickadilla.com/signup?ref=EEIqsp" target="_blank" rel="noopener">Advertise with DevChat</a>
+    </div>
+    <video id="adVideo" muted autoplay playsinline preload="auto"></video>
+  </div>
+  <script>
+    const VAST_URL = "https://vast.yomeno.xyz/vast?spot_id=1490201";
+    const REFRESH_DELAY = 1500;
+    const ERROR_DELAY = 30000;
+    const fallback = document.getElementById("fallback");
+    let player = null;
+
+    function buildPlayer() {
+      if (player) {
+        try { player.destroy(); } catch (e) {}
+        player = null;
+      }
+      // Recreate the video element so Fluid Player gets a clean target
+      const stage = document.querySelector(".stage");
+      const oldVideo = document.getElementById("adVideo");
+      if (oldVideo) oldVideo.remove();
+      const video = document.createElement("video");
+      video.id = "adVideo";
+      video.muted = true;
+      video.autoplay = true;
+      video.setAttribute("playsinline", "");
+      video.setAttribute("preload", "auto");
+      stage.appendChild(video);
+
+      player = fluidPlayer("adVideo", {
+        layoutControls: {
+          primaryColor: "#35ff8a",
+          fillToContainer: true,
+          autoPlay: true,
+          mute: true,
+          muted: true,
+          loop: false,
+          allowDownload: false,
+          playButtonShowing: false,
+          playPauseAnimation: false,
+          posterImage: "",
+          controlBar: { autoHide: true, autoHideTimeout: 2 },
+          logo: { imageUrl: null }
+        },
+        vastOptions: {
+          adList: [{
+            roll: "preRoll",
+            vastTag: VAST_URL + "&cb=" + Date.now(),
+            adText: "Advertisement"
+          }],
+          adCTAText: false,
+          adCTATextPosition: "bottom right",
+          allowVPAID: true,
+          showProgressbarMarkers: false,
+          maxAllowedVastTagRedirects: 5,
+          vastTimeout: 8000,
+          vastAdvanced: {
+            vastLoadedCallback: () => {
+              fallback.style.display = "none";
+            },
+            noVastVideoCallback: () => {
+              fallback.style.display = "grid";
+              setTimeout(reload, ERROR_DELAY);
+            },
+            vastVideoSkippedCallback: () => {
+              setTimeout(reload, REFRESH_DELAY);
+            },
+            vastVideoEndedCallback: () => {
+              setTimeout(reload, REFRESH_DELAY);
+            }
+          }
+        }
+      });
+
+      player.on("play", () => { fallback.style.display = "none"; });
+      player.on("ended", () => { setTimeout(reload, REFRESH_DELAY); });
+      player.on("error", () => { setTimeout(reload, ERROR_DELAY); });
+    }
+
+    function reload() {
+      try { buildPlayer(); }
+      catch (e) { setTimeout(reload, ERROR_DELAY); }
+    }
+
+    window.addEventListener("message", (event) => {
+      if (event.data === "clickVideo" && player) {
+        try { player.play(); } catch (e) {}
+      }
+    });
+
+    if (typeof fluidPlayer === "function") {
+      buildPlayer();
+    } else {
+      window.addEventListener("load", buildPlayer);
+    }
+  </script>
+</body>
+</html>

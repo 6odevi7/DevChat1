@@ -1,0 +1,13 @@
+node_modules
+.git
+.wrangler
+functions
+api.php
+.htaccess
+*.zip
+*.ps1
+*.md
+package-lock.json
+wrangler.toml.example
+_worker.js
+_routes.json
