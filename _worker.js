@@ -13,6 +13,9 @@ export default {
       return handleApi(request, env);
     }
     if (url.pathname === "/") {
+      const target = new Request(new URL("/DevChat.html", url), request);
+      const response = env.ASSETS ? await env.ASSETS.fetch(target) : null;
+      if (response && response.status !== 404) return response;
       return Response.redirect(`${url.origin}/DevChat.html#Lobby`, 302);
     }
     if (env.ASSETS) return env.ASSETS.fetch(request);
