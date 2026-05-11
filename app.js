@@ -1001,7 +1001,7 @@
 
   function safeDisplayName(source) {
     const byId = source && source.userId && state.users.find((user) => user.id === source.userId);
-    const raw = String(source && (source.username || source.realName || source.phoneId) || byId && byId.username || "DevChat").trim();
+    const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || source && (source.realName || source.phoneId) || "DevChat").trim();
     if (!raw || raw.includes("@")) return "DevChat";
     return raw;
   }

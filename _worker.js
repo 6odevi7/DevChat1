@@ -118,9 +118,9 @@ async function handleApi(request, env) {
       return json({ post });
     }
     case "message": {
-      const message = sanitizeMessage(body.message);
-      if (!message || !message.id) return json({ error: "missing message" }, 400);
       const state = await loadState();
+      const message = sanitizeMessage(body.message, state);
+      if (!message || !message.id) return json({ error: "missing message" }, 400);
       state.messages.push(message);
       state.messages = state.messages.slice(-300);
       await saveState(state);
@@ -148,7 +148,7 @@ function publicState(state) {
   return {
     ...state,
     users: Array.isArray(state.users) ? state.users.map(publicUser).filter(Boolean) : [],
-    messages: Array.isArray(state.messages) ? state.messages.map(sanitizeMessage).filter(Boolean) : []
+    messages: Array.isArray(state.messages) ? state.messages.map((message) => sanitizeMessage(message, state)).filter(Boolean) : []
   };
 }
 
@@ -158,16 +158,19 @@ function publicUser(user) {
   return safe;
 }
 
-function sanitizeMessage(message) {
+function sanitizeMessage(message, state = emptyState()) {
   if (!message || typeof message !== "object") return null;
   const clean = { ...message };
-  clean.username = safeDisplayName(clean);
+  clean.username = safeDisplayName(clean, state);
   delete clean.email;
   return clean;
 }
 
-function safeDisplayName(source) {
-  const raw = String(source && (source.username || source.realName || source.phoneId) || "DevChat").trim();
+function safeDisplayName(source, state = emptyState()) {
+  const byId = source && source.userId && Array.isArray(state.users)
+    ? state.users.find((user) => user.id === source.userId)
+    : null;
+  const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || source && (source.realName || source.phoneId) || "DevChat").trim();
   if (!raw || raw.includes("@")) return "DevChat";
   return raw;
 }
