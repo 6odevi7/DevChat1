@@ -12,6 +12,9 @@ export default {
     if (url.pathname === "/api" || url.pathname === "/api/") {
       return handleApi(request, env);
     }
+    if (url.pathname === "/") {
+      return Response.redirect(`${url.origin}/DevChat.html#Lobby`, 302);
+    }
     if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response("DevChat backend is online. Static assets are not attached to this Worker.", {
       status: 200,
