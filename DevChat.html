@@ -8,14 +8,17 @@
   <link rel="stylesheet" href="styles.css?v=2">
   <script src="https://cdn.scaledrone.com/scaledrone.min.js" defer></script>
   <script>
+    if (!location.hash && !new URLSearchParams(location.search).has("profile")) {
+      history.replaceState(null, "", location.pathname + location.search + "#Lobby");
+    }
     window.DEVCHAT_CONFIG = window.DEVCHAT_CONFIG || {
       backend: "cloudflare",
-      apiUrl: "/api",
+      apiUrl: "https://devchat.jintsu67.workers.dev/api",
       requireBackend: true,
       // iceServers: [{ urls: "turn:turn.example.com:3478", username: "user", credential: "pass" }]
     };
   </script>
-  <script src="app.js?v=23" defer></script>
+  <script src="app.js?v=24" defer></script>
 </head>
 <body>
   <main class="shell" id="app">
