@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DevChat</title>
   <meta name="description" content="DevChat connects developers and employers through live chat, posts, profiles, private rooms, and calls.">
+  <link rel="preconnect" href="https://cdn.scaledrone.com">
+  <link rel="preconnect" href="https://devchat.jintsu67.workers.dev">
   <link rel="stylesheet" href="styles.css?v=2">
   <script src="https://cdn.scaledrone.com/scaledrone.min.js" defer></script>
   <script>
@@ -18,7 +20,7 @@
       // iceServers: [{ urls: "turn:turn.example.com:3478", username: "user", credential: "pass" }]
     };
   </script>
-  <script src="app.js?v=24" defer></script>
+  <script src="app.js?v=28" defer></script>
 </head>
 <body>
   <main class="shell" id="app">
@@ -185,7 +187,7 @@ ad billboard armed</pre>
         <button class="primary stretch" id="signupButton" type="button">Create DevChat ID</button>
       </div>
       <div class="auth-pane is-hidden" id="loginPane">
-        <input id="loginUsername" placeholder="Username or email" autocomplete="username">
+        <input id="loginUsername" type="email" placeholder="Email" autocomplete="email">
         <button class="primary stretch" id="loginButton" type="button">Login</button>
       </div>
       <div class="auth-pane is-hidden" id="resetPane">

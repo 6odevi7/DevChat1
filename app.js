@@ -80,6 +80,7 @@
   let privateSub = null;
   let privateSubRoom = "";
   let phoneSub = null;          // personal channel based on my phoneId
+  let realtimeRetryTimer = null;
   let pc = null;
   let localStream = null;
   let remoteStream = null;
@@ -262,11 +263,15 @@
       $("authNote").textContent = "Every sign up field is required.";
       return;
     }
+    if (!isValidEmail(email)) {
+      $("authNote").textContent = "Enter a valid email address.";
+      return;
+    }
     $("authNote").textContent = "Creating account…";
 
     // Always sync from the server first so duplicate checks work across devices.
     await syncFromServer();
-    const existing = state.users.find((user) => user.username.toLowerCase() === username.toLowerCase() || user.email.toLowerCase() === email.toLowerCase());
+    const existing = state.users.find((user) => (user.username || "").toLowerCase() === username.toLowerCase());
     if (existing) {
       $("authNote").textContent = "That username or email already exists.";
       return;
@@ -303,9 +308,9 @@
   }
 
   async function login() {
-    const identity = $("loginUsername").value.trim();
-    if (!identity) {
-      $("authNote").textContent = "Enter a username or email.";
+    const identity = $("loginUsername").value.trim().toLowerCase();
+    if (!isValidEmail(identity)) {
+      $("authNote").textContent = "Enter your account email.";
       return;
     }
     $("authNote").textContent = "Looking up account…";
@@ -318,14 +323,14 @@
       if (!state.users.find((u) => u.id === user.id)) state.users.push(user);
       saveLocalState();
     } else if (remote && remote.error === "not found") {
-      $("authNote").textContent = "No DevChat account matched that username or email.";
+      $("authNote").textContent = "No DevChat account matched that email.";
       return;
     } else if (!remote) {
       $("authNote").textContent = apiErrorMessage();
       return;
     }
     if (!user) {
-      $("authNote").textContent = "No account matched that username or email.";
+      $("authNote").textContent = "No account matched that email.";
       return;
     }
     currentUser = user;
@@ -383,14 +388,14 @@
       const input = $("messageInput");
       const text = input.value.trim();
       if (!text) return;
-      const message = { id: cryptoId(), userId: currentUser.id, username: currentUser.username, text, createdAt: Date.now(), mine: true };
+      const message = createChatMessage(text);
       input.value = "";
       if (isPrivateChatActive()) {
         addRoomMessage(message);
         sendRoom({ type: "room-chat", message: { ...message, mine: false } });
       } else {
         addMessage(message);
-        publishDrone({ type: "lobby-chat", userId: currentUser.id, username: currentUser.username, text, id: message.id });
+        publishDrone({ type: "lobby-chat", userId: currentUser.id, username: safeDisplayName(currentUser), text, id: message.id });
         await api("message", { message: { ...message, mine: false } });
       }
     });
@@ -401,7 +406,7 @@
       const file = event.target.files[0];
       if (!file) return;
       const text = `Uploaded ${file.name} (${formatBytes(file.size)})`;
-      const message = { id: cryptoId(), userId: currentUser.id, username: currentUser.username, text, createdAt: Date.now(), mine: true, fileName: file.name };
+      const message = { ...createChatMessage(text), fileName: file.name };
       if (isPrivateChatActive()) {
         addRoomMessage(message);
         sendRoom({ type: "room-chat", message: { ...message, mine: false } });
@@ -413,6 +418,7 @@
   }
 
   function addMessage(message) {
+    message = sanitizeChatMessage(message);
     state.messages.push(message);
     state.messages = state.messages.slice(-200);
     saveLocalState();
@@ -422,6 +428,7 @@
 
   function addRoomMessage(message) {
     if (!privateRoomHash) return;
+    message = sanitizeChatMessage(message);
     if (!state.roomMessages) state.roomMessages = {};
     const roomMessages = state.roomMessages[privateRoomHash] || [];
     roomMessages.push(message);
@@ -443,26 +450,49 @@
       setTimeout(initRealtime, 250);
       return;
     }
+    if (drone) return;
     try {
       drone = new ScaleDrone(SCALEDRONE_CHANNEL);
       drone.on("open", (error) => {
         if (error) {
-          $("lobbyStatus").textContent = "Realtime unavailable, local mode active";
+          $("lobbyStatus").textContent = "Realtime reconnecting";
+          scheduleRealtimeReconnect();
           return;
+        }
+        if (realtimeRetryTimer) {
+          clearTimeout(realtimeRetryTimer);
+          realtimeRetryTimer = null;
         }
         $("lobbyStatus").textContent = "#Lobby online";
         lobbySub = drone.subscribe(LOBBY_DRONE_ROOM);
         lobbySub.on("data", (message, client) => {
           if (!message || message.type !== "lobby-chat" || (client && client.id === drone.clientId)) return;
           if (message.id && state.messages.some((m) => m.id === message.id)) return;
-          addMessage({ id: message.id || cryptoId(), userId: message.userId, username: message.username, text: message.text, createdAt: Date.now() });
+          addMessage({ id: message.id || cryptoId(), userId: message.userId, username: safeDisplayName(message), text: message.text, createdAt: Date.now() });
         });
         subscribePhoneChannel();
         if (privateRoomHash) subscribePrivateRoom();
       });
+      drone.on("close", scheduleRealtimeReconnect);
+      drone.on("error", scheduleRealtimeReconnect);
     } catch (error) {
-      $("lobbyStatus").textContent = "Realtime unavailable, local mode active";
+      $("lobbyStatus").textContent = "Realtime reconnecting";
+      scheduleRealtimeReconnect();
     }
+  }
+
+  function scheduleRealtimeReconnect() {
+    if (realtimeRetryTimer) return;
+    realtimeRetryTimer = setTimeout(() => {
+      realtimeRetryTimer = null;
+      try { if (drone && drone.close) drone.close(); } catch (e) {}
+      drone = null;
+      lobbySub = null;
+      phoneSub = null;
+      privateSub = null;
+      privateSubRoom = "";
+      initRealtime();
+    }, 2500);
   }
 
   function phoneRoomName(phoneId) {
@@ -942,12 +972,42 @@
   }
 
   function renderMessage(message) {
+    message = sanitizeChatMessage(message);
     const isMine = currentUser && message.userId === currentUser.id;
     return `<article class="message ${isMine ? "mine" : ""}">
-      <strong>${escapeHtml(message.username || "DevChat")}</strong>
+      <strong>${escapeHtml(safeDisplayName(message))}</strong>
       <p>${linkify(message.text || "")}</p>
       ${previewHtml(message.text || "")}
     </article>`;
+  }
+
+  function createChatMessage(text) {
+    return {
+      id: cryptoId(),
+      userId: currentUser.id,
+      username: safeDisplayName(currentUser),
+      text,
+      createdAt: Date.now(),
+      mine: true
+    };
+  }
+
+  function sanitizeChatMessage(message) {
+    const clean = { ...(message || {}) };
+    clean.username = safeDisplayName(clean);
+    delete clean.email;
+    return clean;
+  }
+
+  function safeDisplayName(source) {
+    const byId = source && source.userId && state.users.find((user) => user.id === source.userId);
+    const raw = String(source && (source.username || source.realName || source.phoneId) || byId && byId.username || "DevChat").trim();
+    if (!raw || raw.includes("@")) return "DevChat";
+    return raw;
+  }
+
+  function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
   }
 
   function renderProfile() {

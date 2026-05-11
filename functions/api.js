@@ -68,11 +68,12 @@ export async function onRequest(context) {
 
   switch (action) {
     case "state": {
-      return json(await loadState());
+      return json(publicState(await loadState()));
     }
     case "signup": {
       const user = body.user;
       if (!user || !user.username || !user.email) return json({ error: "missing fields" }, 400);
+      if (!isValidEmail(user.email)) return json({ error: "invalid email" }, 400);
       const state = await loadState();
       const exists = state.users.some((u) =>
         (u.username || "").toLowerCase() === user.username.toLowerCase() ||
@@ -81,18 +82,18 @@ export async function onRequest(context) {
       if (exists) return json({ error: "exists" }, 409);
       state.users.push(user);
       await saveState(state);
-      return json({ user });
+      return json({ user: publicUser(user) });
     }
     case "login": {
-      const identity = String(body.identity || "").trim().toLowerCase();
-      if (!identity) return json({ error: "missing identity" }, 400);
+      const identity = String(body.identity || body.email || "").trim().toLowerCase();
+      if (!identity) return json({ error: "missing email" }, 400);
+      if (!isValidEmail(identity)) return json({ error: "email required" }, 400);
       const state = await loadState();
       const found = state.users.find((u) =>
-        (u.username || "").toLowerCase() === identity ||
         (u.email || "").toLowerCase() === identity
       );
       if (!found) return json({ error: "not found" }, 404);
-      return json({ user: found });
+      return json({ user: publicUser(found) });
     }
     case "post": {
       const post = body.post;
@@ -104,7 +105,7 @@ export async function onRequest(context) {
       return json({ post });
     }
     case "message": {
-      const message = body.message;
+      const message = sanitizeMessage(body.message);
       if (!message || !message.id) return json({ error: "missing message" }, 400);
       const state = await loadState();
       state.messages.push(message);
@@ -116,10 +117,10 @@ export async function onRequest(context) {
       const seed = body.state;
       if (!seed) return json({ error: "missing state" }, 400);
       const state = await loadState();
-      if (state.seeded) return json({ ok: false, state });
+      if (state.seeded) return json({ ok: false, state: publicState(state) });
       const merged = Object.assign(emptyState(), state, seed, { seeded: true });
       await saveState(merged);
-      return json({ ok: true, state: merged });
+      return json({ ok: true, state: publicState(merged) });
     }
     default:
       return json({ error: "unknown action" }, 400);
@@ -128,6 +129,38 @@ export async function onRequest(context) {
 
 function emptyState() {
   return { users: [], posts: [], messages: [], seeded: false };
+}
+
+function publicState(state) {
+  return {
+    ...state,
+    users: Array.isArray(state.users) ? state.users.map(publicUser).filter(Boolean) : [],
+    messages: Array.isArray(state.messages) ? state.messages.map(sanitizeMessage).filter(Boolean) : []
+  };
+}
+
+function publicUser(user) {
+  if (!user || typeof user !== "object") return null;
+  const { email, phone, ...safe } = user;
+  return safe;
+}
+
+function sanitizeMessage(message) {
+  if (!message || typeof message !== "object") return null;
+  const clean = { ...message };
+  clean.username = safeDisplayName(clean);
+  delete clean.email;
+  return clean;
+}
+
+function safeDisplayName(source) {
+  const raw = String(source && (source.username || source.realName || source.phoneId) || "DevChat").trim();
+  if (!raw || raw.includes("@")) return "DevChat";
+  return raw;
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function json(data, status = 200) {
