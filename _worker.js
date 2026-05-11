@@ -126,6 +126,22 @@ async function handleApi(request, env) {
       await saveState(state);
       return json({ message });
     }
+    case "clearMessages": {
+      if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
+      const state = await loadState();
+      state.messages = [];
+      await saveState(state);
+      return json({ ok: true, cleared: "messages" });
+    }
+    case "repairMessages": {
+      if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
+      const state = await loadState();
+      state.messages = Array.isArray(state.messages)
+        ? state.messages.map((message) => sanitizeMessage(message, state)).filter(Boolean)
+        : [];
+      await saveState(state);
+      return json({ ok: true, messages: state.messages.length });
+    }
     case "seed": {
       const seed = body.state;
       if (!seed) return json({ error: "missing state" }, 400);
@@ -177,6 +193,12 @@ function safeDisplayName(source, state = emptyState()) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function isAdminRequest(url, env) {
+  const configured = env.DEVCHAT_ADMIN_TOKEN;
+  if (!configured) return true;
+  return url.searchParams.get("token") === configured;
 }
 
 function json(data, status = 200) {

@@ -113,6 +113,20 @@ export async function onRequest(context) {
       await saveState(state);
       return json({ message });
     }
+    case "clearMessages": {
+      const state = await loadState();
+      state.messages = [];
+      await saveState(state);
+      return json({ ok: true, cleared: "messages" });
+    }
+    case "repairMessages": {
+      const state = await loadState();
+      state.messages = Array.isArray(state.messages)
+        ? state.messages.map((message) => sanitizeMessage(message, state)).filter(Boolean)
+        : [];
+      await saveState(state);
+      return json({ ok: true, messages: state.messages.length });
+    }
     case "seed": {
       const seed = body.state;
       if (!seed) return json({ error: "missing state" }, 400);
