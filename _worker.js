@@ -130,6 +130,34 @@ async function handleApi(request, env) {
       await saveState(state);
       return json({ message });
     }
+    case "pmSend": {
+      const state = await loadState();
+      state.users = state.users.map(normalizeUser);
+      const message = sanitizeMessage(body.message, state);
+      const toUserId = String(body.message && body.message.toUserId || "").trim();
+      if (!message || !message.userId || !toUserId || message.userId === toUserId) return json({ error: "missing pm fields" }, 400);
+      message.toUserId = toUserId;
+      message.threadId = pmThreadId(message.userId, toUserId);
+      state.privateMessages = Array.isArray(state.privateMessages) ? state.privateMessages : [];
+      state.privateMessages.push(message);
+      state.privateMessages = state.privateMessages.slice(-1000);
+      await saveState(state);
+      return json({ message });
+    }
+    case "pmThread": {
+      const state = await loadState();
+      state.users = state.users.map(normalizeUser);
+      const userId = String(body.userId || "").trim();
+      const peerId = String(body.peerId || "").trim();
+      if (!userId || !peerId) return json({ error: "missing pm thread" }, 400);
+      const threadId = pmThreadId(userId, peerId);
+      const messages = (Array.isArray(state.privateMessages) ? state.privateMessages : [])
+        .filter((message) => message.threadId === threadId)
+        .map((message) => sanitizeMessage(message, state))
+        .filter(Boolean)
+        .slice(-100);
+      return json({ threadId, messages });
+    }
     case "clearMessages": {
       if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
       const state = await loadState();
@@ -180,13 +208,14 @@ async function handleApi(request, env) {
 }
 
 function emptyState() {
-  return { users: [], posts: [], messages: [], seeded: false };
+  return { users: [], posts: [], messages: [], privateMessages: [], seeded: false };
 }
 
 function publicState(state) {
   return {
-    ...state,
+    seeded: !!state.seeded,
     users: Array.isArray(state.users) ? state.users.map(publicUser).filter(Boolean) : [],
+    posts: Array.isArray(state.posts) ? state.posts : [],
     messages: Array.isArray(state.messages) ? state.messages.map((message) => sanitizeMessage(message, state)).filter(Boolean) : []
   };
 }
@@ -234,6 +263,10 @@ function safeUserName(user) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function pmThreadId(a, b) {
+  return [String(a), String(b)].sort().join(":");
 }
 
 function isAdminRequest(url, env) {

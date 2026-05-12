@@ -73,12 +73,12 @@ button { cursor: pointer; }
   line-height: 1.65;
 }
 
-.intro-actions, .form-row, .video-controls, .composer, .auth-tabs, .widget-tabs {
+.intro-actions, .form-row, .video-controls, .composer, .auth-tabs, .widget-tabs, .chat-mode-tabs, .pm-tools {
   display: flex;
   gap: 10px;
 }
 
-.primary, .ghost, .tiny, .icon-button, .video-controls button, .widget-tabs button, .auth-tabs button {
+.primary, .ghost, .tiny, .icon-button, .video-controls button, .widget-tabs button, .auth-tabs button, .chat-mode-tabs button {
   border: 1px solid var(--line);
   color: var(--text);
   background: rgba(17, 26, 24, .92);
@@ -210,6 +210,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--acid); }
   overflow: auto;
   padding: 14px;
 }
+
+.chat-mode-tabs {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(3, 10, 8, .72);
+}
+
+.chat-mode-tabs button { flex: 1; }
+.chat-mode-tabs .active { color: #03120a; background: var(--acid); border-color: var(--acid); font-weight: 800; }
+
+.pm-tools {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pm-tools select { flex: 1; min-width: 0; }
 
 .message {
   max-width: 84%;

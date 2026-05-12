@@ -93,6 +93,9 @@
   let apiAvailable = false;
   let callRole = null;          // "caller" or "callee" once a call is active
   let pendingInvite = null;     // {roomHash, fromUser} while modal is open
+  let chatMode = "lobby";       // lobby | pm
+  let pmTargetId = "";
+  let pmMessages = [];
 
   const $ = (id) => document.getElementById(id);
 
@@ -114,6 +117,7 @@
     const sessionId = readSessionId();
     if (sessionId) {
       currentUser = state.users.find((u) => u.id === sessionId) || currentUser;
+      if (currentUser && !state.users.find((u) => u.id === currentUser.id)) state.users.push(currentUser);
     }
     if (!apiAvailable) {
       $("lobbyStatus").textContent = "Backend offline: " + (lastApiError || "unknown");
@@ -235,6 +239,11 @@
     document.querySelectorAll("[data-widget-tab]").forEach((button) => {
       button.addEventListener("click", () => renderWidget(button.dataset.widgetTab));
     });
+    document.querySelectorAll("[data-chat-mode]").forEach((button) => {
+      button.addEventListener("click", () => setChatMode(button.dataset.chatMode));
+    });
+    $("pmTarget").addEventListener("change", () => setPmTarget($("pmTarget").value));
+    $("refreshPm").addEventListener("click", () => loadPmThread());
     $("callAccept").addEventListener("click", acceptIncomingCall);
     $("callDecline").addEventListener("click", declineIncomingCall);
   }
@@ -401,7 +410,11 @@
       if (!text) return;
       const message = createChatMessage(text);
       input.value = "";
-      if (isPrivateChatActive()) {
+      if (chatMode === "pm") {
+        if (!pmTargetId) { appendSystem("Select a user for PM first."); return; }
+        addPmMessage(message);
+        await api("pmSend", { message: { ...message, toUserId: pmTargetId, mine: false } });
+      } else if (isPrivateChatActive()) {
         addRoomMessage(message);
         sendRoom({ type: "room-chat", message: { ...message, mine: false } });
       } else {
@@ -418,7 +431,11 @@
       if (!file) return;
       const text = `Uploaded ${file.name} (${formatBytes(file.size)})`;
       const message = { ...createChatMessage(text), fileName: file.name };
-      if (isPrivateChatActive()) {
+      if (chatMode === "pm") {
+        if (!pmTargetId) { appendSystem("Select a user for PM first."); return; }
+        addPmMessage(message);
+        api("pmSend", { message: { ...message, toUserId: pmTargetId, mine: false } }).catch(() => {});
+      } else if (isPrivateChatActive()) {
         addRoomMessage(message);
         sendRoom({ type: "room-chat", message: { ...message, mine: false } });
       } else {
@@ -447,6 +464,13 @@
     saveLocalState();
     renderMessages();
     renderWidget("chat");
+  }
+
+  function addPmMessage(message) {
+    pmMessages.push(sanitizeChatMessage(message));
+    pmMessages = pmMessages.slice(-100);
+    renderMessages();
+    renderWidget("pm");
   }
 
   function appendSystem(text) {
@@ -928,6 +952,7 @@
   function renderAll() {
     renderSession();
     renderPosts();
+    renderPmTargets();
     renderMessages();
     renderProfile();
     $("roomUrl").textContent = privateRoomHash ? location.href : lobbyUrl();
@@ -939,7 +964,7 @@
     $("sessionName").textContent = currentUser ? safeUserName(currentUser) : "Guest viewer";
     $("sessionPhone").textContent = currentUser ? currentUser.phoneId : "Sign up to message";
     $("messageInput").placeholder = currentUser
-      ? (isPrivateChatActive() ? "Message the private room" : "Message the #Lobby")
+      ? (chatMode === "pm" ? "Send a private message" : isPrivateChatActive() ? "Message the private room" : "Message the #Lobby")
       : "Sign up or login to send a message";
   }
 
@@ -959,8 +984,11 @@
     const messages = activeMessages();
     const title = document.querySelector(".chat-panel .panel-head h3");
     const status = $("lobbyStatus");
-    if (title) title.textContent = isPrivateChatActive() ? "Private Room Chat" : "Lobby Chat";
-    if (status && apiAvailable) status.textContent = isPrivateChatActive() ? `Room ${privateRoomHash}` : "#Lobby online";
+    const pmUser = pmTargetUser();
+    if (title) title.textContent = chatMode === "pm" ? "Private Messages" : isPrivateChatActive() ? "Private Room Chat" : "Lobby Chat";
+    if (status && apiAvailable) status.textContent = chatMode === "pm" ? (pmUser ? `PM with ${safeUserName(pmUser)}` : "Select a user") : isPrivateChatActive() ? `Room ${privateRoomHash}` : "#Lobby online";
+    document.querySelectorAll("[data-chat-mode]").forEach((button) => button.classList.toggle("active", button.dataset.chatMode === chatMode));
+    $("pmTools").classList.toggle("is-hidden", chatMode !== "pm");
     $("lobbyMessages").innerHTML = messages.map((message) => renderMessage(message)).join("");
     $("lobbyMessages").querySelectorAll("[data-preview-url]").forEach((link) => {
       link.addEventListener("click", (event) => {
@@ -973,8 +1001,49 @@
   }
 
   function activeMessages() {
+    if (chatMode === "pm") return pmMessages;
     if (!isPrivateChatActive()) return state.messages;
     return state.roomMessages && state.roomMessages[privateRoomHash] || [];
+  }
+
+  function setChatMode(mode) {
+    chatMode = mode === "pm" ? "pm" : "lobby";
+    if (chatMode === "pm") {
+      renderPmTargets();
+      loadPmThread();
+    }
+    renderMessages();
+  }
+
+  function renderPmTargets() {
+    const select = $("pmTarget");
+    if (!select) return;
+    const options = state.users
+      .filter((user) => currentUser && user.id !== currentUser.id)
+      .map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(safeUserName(user))}</option>`)
+      .join("");
+    select.innerHTML = `<option value="">Select user</option>${options}`;
+    if (pmTargetId) select.value = pmTargetId;
+  }
+
+  function setPmTarget(userId) {
+    pmTargetId = userId || "";
+    pmMessages = [];
+    loadPmThread();
+  }
+
+  async function loadPmThread() {
+    if (chatMode !== "pm" || !currentUser || !pmTargetId) {
+      renderMessages();
+      return;
+    }
+    const data = await api("pmThread", { userId: currentUser.id, peerId: pmTargetId });
+    pmMessages = data && Array.isArray(data.messages) ? data.messages.map(sanitizeChatMessage) : pmMessages;
+    renderMessages();
+  }
+
+  function pmTargetUser() {
+    return state.users.find((user) => user.id === pmTargetId);
   }
 
   function isPrivateChatActive() {
@@ -1070,6 +1139,18 @@
     document.querySelectorAll("[data-widget-tab]").forEach((button) => button.classList.toggle("active", button.dataset.widgetTab === tab));
     if (tab === "posts") {
       $("widgetBody").innerHTML = state.posts.slice(0, 4).map((post) => `<article class="post"><h4>${escapeHtml(post.title)}</h4><p>${escapeHtml(post.description)}</p><div class="meta"><span>${post.type}</span><span>${escapeHtml(post.price)}</span></div></article>`).join("");
+    } else if (tab === "pm") {
+      const targets = state.users
+        .filter((user) => currentUser && user.id !== currentUser.id)
+        .map((user) => `<button class="tiny ghost stretch" data-widget-pm="${escapeHtml(user.id)}" type="button">${escapeHtml(safeUserName(user))}</button>`)
+        .join("");
+      $("widgetBody").innerHTML = `<div class="auth-pane">${targets || `<p class="modal-note">Login and sync users to send PMs.</p>`}</div>`;
+      $("widgetBody").querySelectorAll("[data-widget-pm]").forEach((button) => {
+        button.addEventListener("click", () => {
+          setChatMode("pm");
+          setPmTarget(button.dataset.widgetPm);
+        });
+      });
     } else if (tab === "room") {
       const label = privateRoomHash ? `Private room ${escapeHtml(privateRoomHash)}` : `#${LOBBY_HASH}`;
       $("widgetBody").innerHTML = `<p class="modal-note">${label} is ready.</p><button class="primary stretch" data-widget-start-call type="button">Start Call</button><p class="modal-note">${escapeHtml(privateRoomHash ? location.href : lobbyUrl())}</p>`;
@@ -1313,7 +1394,7 @@
   }
 
   function baseState() {
-    return { users: [], posts: [], messages: [], roomMessages: {}, currentUser: "", seeded: false };
+    return { users: [], posts: [], messages: [], privateMessages: [], roomMessages: {}, currentUser: "", seeded: false };
   }
 
   function saveLocalState() {
@@ -1324,7 +1405,7 @@
   function readSession() {
     const sid = readSessionId();
     if (!sid) return null;
-    return state.users.find((u) => u.id === sid) || null;
+    return state.users.find((u) => u.id === sid) || readSessionUser();
   }
 
   function readSessionId() {
@@ -1333,7 +1414,34 @@
   }
 
   function writeSession(user) {
-    try { localStorage.setItem(SESSION_KEY, user ? user.id : ""); } catch (e) {}
+    try {
+      if (!user) {
+        localStorage.setItem(SESSION_KEY, "");
+        localStorage.removeItem(SESSION_KEY + ".user");
+        return;
+      }
+      const safe = normalizeUser(user);
+      localStorage.setItem(SESSION_KEY, safe.id || "");
+      localStorage.setItem(SESSION_KEY + ".user", JSON.stringify({
+        id: safe.id,
+        username: safe.username,
+        handle: safe.handle,
+        realName: safe.realName,
+        phoneId: safe.phoneId,
+        profileUrl: safe.profileUrl,
+        socials: safe.socials || [],
+        createdAt: safe.createdAt
+      }));
+    } catch (e) {}
+  }
+
+  function readSessionUser() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY + ".user");
+      return raw ? normalizeUser(JSON.parse(raw)) : null;
+    } catch {
+      return null;
+    }
   }
 
   function escapeHtml(value) {

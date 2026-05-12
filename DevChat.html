@@ -7,7 +7,7 @@
   <meta name="description" content="DevChat connects developers and employers through live chat, posts, profiles, private rooms, and calls.">
   <link rel="preconnect" href="https://cdn.scaledrone.com">
   <link rel="preconnect" href="https://devchat.jintsu67.workers.dev">
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
   <script src="https://cdn.scaledrone.com/scaledrone.min.js" defer></script>
   <script>
     if (!location.hash && !new URLSearchParams(location.search).has("profile")) {
@@ -20,7 +20,7 @@
       // iceServers: [{ urls: "turn:turn.example.com:3478", username: "user", credential: "pass" }]
     };
   </script>
-  <script src="app.js?v=35" defer></script>
+  <script src="app.js?v=37" defer></script>
 </head>
 <body>
   <main class="shell" id="app">
@@ -52,7 +52,7 @@ ad billboard armed</pre>
           <h2 id="profilePageTitle">DevChat profile</h2>
         </div>
         <div class="session-card">
-          <a class="tiny ghost" href="DevChat.html">← Back to DevChat</a>
+          <a class="tiny ghost" href="DevChat.html#Lobby">← Back to DevChat</a>
         </div>
       </header>
       <section class="profile-grid">
@@ -110,6 +110,16 @@ ad billboard armed</pre>
             </div>
             <button class="icon-button" id="openWidget" type="button" title="Open widget">▣</button>
           </div>
+          <div class="chat-mode-tabs">
+            <button class="active" data-chat-mode="lobby" type="button">Lobby</button>
+            <button data-chat-mode="pm" type="button">PM</button>
+          </div>
+          <div class="pm-tools is-hidden" id="pmTools">
+            <select id="pmTarget">
+              <option value="">Select user</option>
+            </select>
+            <button class="tiny" id="refreshPm" type="button">Refresh</button>
+          </div>
           <div class="messages" id="lobbyMessages" aria-live="polite"></div>
           <div class="composer">
             <label class="upload-button" title="Attach file">
@@ -160,6 +170,7 @@ ad billboard armed</pre>
     </div>
     <div class="widget-tabs">
       <button class="active" data-widget-tab="chat" type="button">Chat</button>
+      <button data-widget-tab="pm" type="button">PM</button>
       <button data-widget-tab="posts" type="button">Posts</button>
       <button data-widget-tab="room" type="button">Room</button>
     </div>
