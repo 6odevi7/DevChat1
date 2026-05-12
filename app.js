@@ -158,7 +158,7 @@
       return;
     }
 
-    const displayName = user.realName || "DevChat member";
+    const displayName = safeUserName(user);
     $("profilePageTitle").textContent = `${displayName} · DevChat`;
     document.title = `${displayName} · DevChat`;
 
@@ -168,8 +168,7 @@
 
     const joined = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—";
 
-    // Public profile: real name + phone ID + links + posts.
-    // Username and email are intentionally hidden (they double as login credentials).
+    // Public profile: username + phone ID + links + posts.
     $("profileSummary").innerHTML = `
       <h3 class="profile-name">${escapeHtml(displayName)}</h3>
       <p class="profile-handle">${escapeHtml(user.phoneId || "")}</p>
@@ -352,7 +351,7 @@
     $("authModal").close();
     renderAll();
     subscribePhoneChannel();
-    appendSystem(`${safeUserName(user)} logged in.`);
+    appendSystem(`"${safeUserName(user)}" logged in.`);
   }
 
   function resetPassword() {
@@ -524,7 +523,7 @@
   function handlePhoneSignal(message) {
     if (message.type === "call-invite") {
       pendingInvite = { roomHash: message.roomHash, fromUser: message.from };
-      const who = message.from && (message.from.realName || message.from.phoneId) || "Someone";
+      const who = message.from && safeUserName(message.from) || "Someone";
       $("callModalTitle").textContent = "Incoming call";
       $("callModalBody").textContent = `${who} (${message.from && message.from.phoneId || ""}) is calling. Accept to join the private room.`;
       try { $("callModal").showModal(); } catch (e) {}
@@ -892,7 +891,7 @@
       // Refresh the user cache so we can address newly-registered phone IDs.
       await syncFromServer().catch(() => {});
       const callee = state.users.find((u) => u.phoneId === phoneId);
-      const calleeLabel = callee ? (callee.realName || callee.phoneId) : phoneId;
+      const calleeLabel = callee ? safeUserName(callee) : phoneId;
 
       // Place the caller into a fresh private room and become the "caller" role.
       callRole = "caller";
@@ -908,7 +907,6 @@
           roomHash,
           from: {
             phoneId: currentUser.phoneId,
-            realName: currentUser.realName,
             username: currentUser.username
           }
         }
@@ -938,7 +936,7 @@
   }
 
   function renderSession() {
-    $("sessionName").textContent = currentUser ? currentUser.username : "Guest viewer";
+    $("sessionName").textContent = currentUser ? safeUserName(currentUser) : "Guest viewer";
     $("sessionPhone").textContent = currentUser ? currentUser.phoneId : "Sign up to message";
     $("messageInput").placeholder = currentUser
       ? (isPrivateChatActive() ? "Message the private room" : "Message the #Lobby")
@@ -952,7 +950,7 @@
         <h4>${escapeHtml(post.title)}</h4>
         <p>${escapeHtml(post.description)}</p>
         <div class="meta"><span>${post.type}</span><span>${escapeHtml(post.price)}</span></div>
-        <div class="meta"><span>${author ? escapeHtml(author.username) : "DevChat"}</span><span>${timeAgo(post.createdAt)}</span></div>
+        <div class="meta"><span>${author ? escapeHtml(safeUserName(author)) : "DevChat"}</span><span>${timeAgo(post.createdAt)}</span></div>
       </article>`;
     }).join("");
   }
@@ -1058,8 +1056,8 @@
       $("profileCard").innerHTML = "Profiles are generated after signup with a public URL, phone ID, portfolio links, and work status.";
       return;
     }
-    $("profileCard").innerHTML = `<strong>${escapeHtml(currentUser.realName)}</strong><br>
-      <span>${escapeHtml(currentUser.username)} · ${currentUser.phoneId}</span><br>
+    $("profileCard").innerHTML = `<strong>${escapeHtml(safeUserName(currentUser))}</strong><br>
+      <span>${escapeHtml(currentUser.phoneId || "")}</span><br>
       <a href="${currentUser.profileUrl}" target="_blank" rel="noopener">${currentUser.profileUrl}</a>`;
   }
 
