@@ -116,8 +116,15 @@
     // session created on another device still loads correctly here.
     const sessionId = readSessionId();
     if (sessionId) {
-      currentUser = state.users.find((u) => u.id === sessionId) || currentUser;
-      if (currentUser && !state.users.find((u) => u.id === currentUser.id)) state.users.push(currentUser);
+      const serverUser = state.users.find((u) => u.id === sessionId);
+      if (serverUser) {
+        currentUser = serverUser;
+      } else if (REQUIRE_BACKEND) {
+        currentUser = null;
+        writeSession(null);
+      } else if (currentUser && !state.users.find((u) => u.id === currentUser.id)) {
+        state.users.push(currentUser);
+      }
     }
     if (!apiAvailable) {
       $("lobbyStatus").textContent = "Backend offline: " + (lastApiError || "unknown");
@@ -290,11 +297,6 @@
 
     // Always sync from the server first so duplicate checks work across devices.
     await syncFromServer();
-    const existing = state.users.find((user) => (user.username || "").toLowerCase() === username.toLowerCase());
-    if (existing) {
-      $("authNote").textContent = "That username or email already exists.";
-      return;
-    }
     const newUser = {
       id: cryptoId(),
       username,

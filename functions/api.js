@@ -74,17 +74,29 @@ export async function onRequest(context) {
       const user = body.user;
       if (!user || !user.username || !user.email) return json({ error: "missing fields" }, 400);
       if (!isValidEmail(user.email)) return json({ error: "invalid email" }, 400);
+      user.email = String(user.email).trim().toLowerCase();
       user.handle = user.handle || user.username;
       const state = await loadState();
       state.users = state.users.map(normalizeUser);
-      const exists = state.users.some((u) =>
-        (u.username || "").toLowerCase() === user.username.toLowerCase() ||
-        (u.email || "").toLowerCase() === user.email.toLowerCase()
-      );
-      if (exists) return json({ error: "exists" }, 409);
-      state.users.push(normalizeUser(user));
+      const usernameMatch = state.users.find((u) => sameText(u.username, user.username));
+      const emailMatch = state.users.find((u) => sameText(u.email, user.email));
+      if (usernameMatch) {
+        if (emailMatch && emailMatch.id !== usernameMatch.id) return json({ error: "exists" }, 409);
+        if (usernameMatch.email && !sameText(usernameMatch.email, user.email)) {
+          return json({ error: "exists" }, 409);
+        }
+        usernameMatch.email = user.email;
+        usernameMatch.phone = user.phone || usernameMatch.phone;
+        usernameMatch.realName = user.realName || usernameMatch.realName;
+        usernameMatch.handle = usernameMatch.username || user.username;
+        await saveState(state);
+        return json({ user: publicUser(usernameMatch), repaired: true });
+      }
+      if (emailMatch) return json({ error: "exists" }, 409);
+      const savedUser = normalizeUser(user);
+      state.users.push(savedUser);
       await saveState(state);
-      return json({ user: publicUser(user) });
+      return json({ user: publicUser(savedUser) });
     }
     case "login": {
       const identity = String(body.identity || body.email || "").trim().toLowerCase();
@@ -259,6 +271,10 @@ function safeUserName(user) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function sameText(a, b) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 }
 
 function pmThreadId(a, b) {
