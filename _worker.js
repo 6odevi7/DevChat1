@@ -1,4 +1,5 @@
 const KV_KEY = "devchat-state";
+const BACKEND_VERSION = "devchat-email-login-fix-2026-05-12";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -59,6 +60,7 @@ async function handleApi(request, env) {
     return json({
       ok: !!KV,
       runtime: "cloudflare-pages-worker",
+      version: BACKEND_VERSION,
       kvBound: !!KV,
       hint: KV ? "Backend ready" : "Bind a KV namespace named DEVCHAT_KV in the Pages project settings."
     });
