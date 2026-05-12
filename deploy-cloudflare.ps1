@@ -1,3 +1,7 @@
+param(
+  [switch]$ResetDevChatState
+)
+
 $ErrorActionPreference = "Stop"
 $ExpectedBackendVersion = "devchat-email-login-fix-2026-05-12"
 $WorkerApi = "https://devchat.jintsu67.workers.dev/api"
@@ -56,23 +60,25 @@ if ($healthJson.version -ne $ExpectedBackendVersion) {
   throw "Cloudflare is still serving old Worker code at $WorkerApi. Expected backend version '$ExpectedBackendVersion' but got '$($healthJson.version)'. Read the deploy output above and confirm Wrangler deployed to https://devchat.jintsu67.workers.dev, not another Worker or Pages project."
 }
 
-Write-Host ""
-Write-Host "Clearing broken/stale DevChat users..."
-try {
-  $reset = Invoke-WebRequest -Uri "${WorkerApi}?action=clearUsers&_=$(Get-Random)" -UseBasicParsing
-  Write-Host $reset.Content
-} catch {
-  Write-Host "clearUsers is not available on the live Worker yet; deleting the KV state key directly..."
-  & $WranglerCmd kv key delete "devchat-state" --namespace-id $KvNamespaceId --force
-  $state = Invoke-WebRequest -Uri "${WorkerApi}?action=state&_=$(Get-Random)" -UseBasicParsing
-  Write-Host $state.Content
+if ($ResetDevChatState) {
+  Write-Host ""
+  Write-Host "Clearing broken/stale DevChat users..."
+  try {
+    $reset = Invoke-WebRequest -Uri "${WorkerApi}?action=clearUsers&_=$(Get-Random)" -UseBasicParsing
+    Write-Host $reset.Content
+  } catch {
+    Write-Host "clearUsers is not available on the live Worker yet; deleting the KV state key directly..."
+    & $WranglerCmd kv key delete "devchat-state" --namespace-id $KvNamespaceId --force
+    $state = Invoke-WebRequest -Uri "${WorkerApi}?action=state&_=$(Get-Random)" -UseBasicParsing
+    Write-Host $state.Content
+  }
+
+  $finalState = Invoke-WebRequest -Uri "${WorkerApi}?action=state&_=$(Get-Random)" -UseBasicParsing
+  $finalJson = $finalState.Content | ConvertFrom-Json
+  if ($finalJson.users.Count -ne 0) {
+    throw "DevChat users were not cleared. Current state: $($finalState.Content)"
+  }
 }
 
-$finalState = Invoke-WebRequest -Uri "${WorkerApi}?action=state&_=$(Get-Random)" -UseBasicParsing
-$finalJson = $finalState.Content | ConvertFrom-Json
-if ($finalJson.users.Count -ne 0) {
-  throw "DevChat users were not cleared. Current state: $($finalState.Content)"
-}
-
 Write-Host ""
-Write-Host "Done. Open DevChat in a private window or hard refresh, then sign up again."
+Write-Host "Done. Open DevChat and hard refresh to load the upgraded files."

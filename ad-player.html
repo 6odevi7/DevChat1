@@ -75,10 +75,14 @@
   </div>
   <script>
     const VAST_URL = "https://vast.yomeno.xyz/vast?spot_id=1490201";
-    const REFRESH_DELAY = 1500;
-    const ERROR_DELAY = 30000;
+    const REFRESH_DELAY = 120000;
+    const SKIP_DELAY = 180000;
+    const ERROR_DELAY = 60000;
+    const MIN_RELOAD_GAP = 45000;
     const fallback = document.getElementById("fallback");
     let player = null;
+    let reloadTimer = null;
+    let lastReloadAt = 0;
 
     function buildPlayer() {
       if (player) {
@@ -130,26 +134,37 @@
             },
             noVastVideoCallback: () => {
               fallback.style.display = "grid";
-              setTimeout(reload, ERROR_DELAY);
+              scheduleReload(ERROR_DELAY);
             },
             vastVideoSkippedCallback: () => {
-              setTimeout(reload, REFRESH_DELAY);
+              scheduleReload(SKIP_DELAY);
             },
             vastVideoEndedCallback: () => {
-              setTimeout(reload, REFRESH_DELAY);
+              scheduleReload(REFRESH_DELAY);
             }
           }
         }
       });
 
       player.on("play", () => { fallback.style.display = "none"; });
-      player.on("ended", () => { setTimeout(reload, REFRESH_DELAY); });
-      player.on("error", () => { setTimeout(reload, ERROR_DELAY); });
+      player.on("ended", () => { scheduleReload(REFRESH_DELAY); });
+      player.on("error", () => { scheduleReload(ERROR_DELAY); });
+    }
+
+    function scheduleReload(delay) {
+      if (reloadTimer) return;
+      const elapsed = Date.now() - lastReloadAt;
+      const wait = Math.max(delay, MIN_RELOAD_GAP - elapsed);
+      reloadTimer = setTimeout(() => {
+        reloadTimer = null;
+        reload();
+      }, wait);
     }
 
     function reload() {
+      lastReloadAt = Date.now();
       try { buildPlayer(); }
-      catch (e) { setTimeout(reload, ERROR_DELAY); }
+      catch (e) { scheduleReload(ERROR_DELAY); }
     }
 
     window.addEventListener("message", (event) => {

@@ -4,6 +4,8 @@
   const SCALEDRONE_CHANNEL = "2xmbUiTsqTzukyf7";
   const LOBBY_HASH = "Lobby";
   const LOBBY_DRONE_ROOM = "observable-devchat-lobby";
+  const SERVER_SYNC_INTERVAL = 7000;
+  const PM_SYNC_INTERVAL = 6000;
   const IS_HTTP = location.protocol === "http:" || location.protocol === "https:";
   const DEVCHAT_CONFIG = window.DEVCHAT_CONFIG || {};
   const REQUIRE_BACKEND = DEVCHAT_CONFIG.requireBackend !== false;
@@ -96,6 +98,11 @@
   let chatMode = "lobby";       // lobby | pm
   let pmTargetId = "";
   let pmMessages = [];
+  let serverSyncTimer = null;
+  let pmSyncTimer = null;
+  let syncingServer = false;
+  let activeWidgetTab = "chat";
+  let widgetDraft = "";
 
   const $ = (id) => document.getElementById(id);
 
@@ -134,6 +141,7 @@
     bindUi();
     renderAll();
     initRealtime();
+    startBackgroundSync();
     appendSystem("Latest chats and posts load for guests. Sign up or login to send messages.");
     window.addEventListener("hashchange", onHashChange);
 
@@ -447,6 +455,7 @@
       const text = input.value.trim();
       if (!text) return;
       input.value = "";
+      widgetDraft = "";
       await sendTextMessage(text);
     });
   }
@@ -473,11 +482,11 @@
 
   function addMessage(message) {
     message = sanitizeChatMessage(message);
-    state.messages.push(message);
+    state.messages = upsertById(state.messages, message);
     state.messages = state.messages.slice(-200);
     saveLocalState();
     renderMessages();
-    renderWidget("chat");
+    renderWidgetCurrent();
   }
 
   function addRoomMessage(message) {
@@ -485,18 +494,18 @@
     message = sanitizeChatMessage(message);
     if (!state.roomMessages) state.roomMessages = {};
     const roomMessages = state.roomMessages[privateRoomHash] || [];
-    roomMessages.push(message);
+    upsertById(roomMessages, message);
     state.roomMessages[privateRoomHash] = roomMessages.slice(-100);
     saveLocalState();
     renderMessages();
-    renderWidget("chat");
+    renderWidgetCurrent();
   }
 
   function addPmMessage(message) {
-    pmMessages.push(sanitizeChatMessage(message));
+    pmMessages = upsertById(pmMessages, sanitizeChatMessage(message));
     pmMessages = pmMessages.slice(-100);
     renderMessages();
-    renderWidget("pm");
+    renderWidgetCurrent();
   }
 
   function appendSystem(text) {
@@ -525,6 +534,7 @@
           realtimeRetryTimer = null;
         }
         $("lobbyStatus").textContent = "#Lobby online";
+        syncFromServer({ render: true }).catch(() => {});
         lobbySub = drone.subscribe(LOBBY_DRONE_ROOM);
         lobbySub.on("data", (message, client) => {
           if (!message || message.type !== "lobby-chat" || (client && client.id === drone.clientId)) return;
@@ -1002,7 +1012,7 @@
     renderProfile();
     $("roomUrl").textContent = privateRoomHash ? location.href : lobbyUrl();
     renderCallControls();
-    renderWidget("chat");
+    renderWidgetCurrent();
   }
 
   function renderSession() {
@@ -1027,6 +1037,9 @@
 
   function renderMessages() {
     const messages = activeMessages();
+    const box = $("lobbyMessages");
+    const shouldStick = !box || box.scrollHeight - box.scrollTop - box.clientHeight < 96;
+    const oldScrollTop = box ? box.scrollTop : 0;
     const title = document.querySelector(".chat-panel .panel-head h3");
     const status = $("lobbyStatus");
     const pmUser = pmTargetUser();
@@ -1034,14 +1047,14 @@
     if (status && apiAvailable) status.textContent = chatMode === "pm" ? (pmUser ? `PM with ${safeUserName(pmUser)}` : "Select a user") : isPrivateChatActive() ? `Room ${privateRoomHash}` : "#Lobby online";
     document.querySelectorAll("[data-chat-mode]").forEach((button) => button.classList.toggle("active", button.dataset.chatMode === chatMode));
     $("pmTools").classList.toggle("is-hidden", chatMode !== "pm");
-    $("lobbyMessages").innerHTML = messages.map((message) => renderMessage(message)).join("");
-    $("lobbyMessages").querySelectorAll("[data-preview-url]").forEach((link) => {
+    box.innerHTML = messages.map((message) => renderMessage(message)).join("");
+    box.querySelectorAll("[data-preview-url]").forEach((link) => {
       link.addEventListener("click", (event) => {
         event.preventDefault();
         openLinkModal(link.dataset.previewUrl);
       });
     });
-    $("lobbyMessages").scrollTop = $("lobbyMessages").scrollHeight;
+    box.scrollTop = shouldStick ? box.scrollHeight : oldScrollTop;
     renderSession();
   }
 
@@ -1058,6 +1071,7 @@
       loadPmThread();
     }
     renderMessages();
+    renderWidgetCurrent();
   }
 
   function renderPmTargets() {
@@ -1075,6 +1089,7 @@
     pmTargetId = userId || "";
     pmMessages = [];
     loadPmThread();
+    renderWidgetCurrent();
   }
 
   async function loadPmThread() {
@@ -1085,6 +1100,7 @@
     const data = await api("pmThread", { userId: currentUser.id, peerId: pmTargetId });
     pmMessages = data && Array.isArray(data.messages) ? data.messages.map(sanitizeChatMessage) : pmMessages;
     renderMessages();
+    renderWidgetCurrent();
   }
 
   function pmTargetUser() {
@@ -1177,10 +1193,14 @@
 
   function openWidget() {
     $("chatWidget").classList.remove("is-hidden");
-    renderWidget("chat");
+    renderWidget(activeWidgetTab || "chat");
   }
 
   function renderWidget(tab) {
+    activeWidgetTab = tab || activeWidgetTab || "chat";
+    const existingInput = $("widgetMessageInput");
+    if (existingInput) widgetDraft = existingInput.value;
+    tab = activeWidgetTab;
     document.querySelectorAll("[data-widget-tab]").forEach((button) => button.classList.toggle("active", button.dataset.widgetTab === tab));
     if (tab === "posts") {
       $("widgetBody").innerHTML = state.posts.slice(0, 4).map((post) => `<article class="post"><h4>${escapeHtml(post.title)}</h4><p>${escapeHtml(post.description)}</p><div class="meta"><span>${post.type}</span><span>${escapeHtml(post.price)}</span></div></article>`).join("");
@@ -1213,6 +1233,12 @@
     }
   }
 
+  function renderWidgetCurrent() {
+    const widget = $("chatWidget");
+    if (!widget || widget.classList.contains("is-hidden")) return;
+    renderWidget(activeWidgetTab || "chat");
+  }
+
   function widgetChatHtml() {
     const label = chatMode === "pm" ? "PM" : isPrivateChatActive() ? "Private room" : "Lobby";
     return `
@@ -1228,9 +1254,13 @@
     const input = $("widgetMessageInput");
     const button = $("widgetSendMessage");
     if (button) button.addEventListener("click", sendWidgetMessage);
-    if (input) input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") sendWidgetMessage();
-    });
+    if (input) {
+      input.value = widgetDraft;
+      input.addEventListener("input", () => { widgetDraft = input.value; });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") sendWidgetMessage();
+      });
+    }
   }
 
   function openLinkModal(url) {
@@ -1300,7 +1330,7 @@
 
   let lastApiError = "";
 
-  async function syncFromServer() {
+  async function syncFromServer(options = {}) {
     if (!API_URL) {
       apiAvailable = false;
       lastApiError = "No backend detected. DevChat requires /api or api.php.";
@@ -1326,19 +1356,58 @@
       lastApiError = "";
       if (Array.isArray(data.users)) state.users = mergeById(state.users, data.users.map(normalizeUser));
       if (Array.isArray(data.posts)) state.posts = mergeById(state.posts, data.posts);
-      if (Array.isArray(data.messages)) state.messages = mergeById(state.messages, data.messages).slice(-200);
+      if (Array.isArray(data.messages)) state.messages = mergeById(state.messages, data.messages.map(sanitizeChatMessage)).slice(-200);
       if (data.seeded) state.seeded = true;
       saveLocalState();
+      if (options.render) {
+        renderPmTargets();
+        renderPosts();
+        renderMessages();
+        renderWidgetCurrent();
+      }
     } catch (e) {
       lastApiError = "Network error reaching " + API_URL + " (" + (e && e.message || e) + ")";
       apiAvailable = false;
     }
   }
 
+  function startBackgroundSync() {
+    if (serverSyncTimer) return;
+    const sync = async () => {
+      if (syncingServer || document.hidden) return;
+      syncingServer = true;
+      try {
+        await syncFromServer({ render: true });
+        if (chatMode === "pm" && pmTargetId) await loadPmThread();
+      } finally {
+        syncingServer = false;
+      }
+    };
+    serverSyncTimer = setInterval(sync, SERVER_SYNC_INTERVAL);
+    pmSyncTimer = setInterval(() => {
+      if (!document.hidden && chatMode === "pm" && pmTargetId) loadPmThread();
+    }, PM_SYNC_INTERVAL);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) sync();
+    });
+  }
+
   function mergeById(a, b) {
     const map = new Map();
     [...a, ...b].forEach((item) => { if (item && item.id) map.set(item.id, item); });
     return Array.from(map.values());
+  }
+
+  function upsertById(list, item) {
+    const next = Array.isArray(list) ? list : [];
+    if (!item || !item.id) {
+      next.push(item);
+      return next;
+    }
+    const index = next.findIndex((existing) => existing && existing.id === item.id);
+    if (index >= 0) next[index] = Object.assign({}, next[index], item);
+    else next.push(item);
+    return next;
   }
 
   function b64UrlEncode(obj) {
