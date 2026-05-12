@@ -982,10 +982,11 @@
   }
 
   function createChatMessage(text) {
+    const username = safeDisplayName(currentUser);
     return {
       id: cryptoId(),
       userId: currentUser.id,
-      username: safeDisplayName(currentUser),
+      username: username === "DevChat" && currentUser.username ? currentUser.username : username,
       text,
       createdAt: Date.now(),
       mine: true
@@ -1001,7 +1002,8 @@
 
   function safeDisplayName(source) {
     const byId = source && source.userId && state.users.find((user) => user.id === source.userId);
-    const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || source && (source.realName || source.phoneId) || "DevChat").trim();
+    const ownUser = currentUser && source && source.userId === currentUser.id ? currentUser : null;
+    const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || ownUser && ownUser.username || source && (source.realName || source.phoneId) || "DevChat").trim();
     if (!raw || raw.includes("@")) return "DevChat";
     return raw;
   }
