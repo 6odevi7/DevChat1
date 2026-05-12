@@ -113,13 +113,13 @@
   document.addEventListener("DOMContentLoaded", init);
 
   async function init() {
-    // First visits stay on the landing page. The workspace opens only from the
-    // Enter DevChat path (?app=1#Lobby) or a private room invite.
+    // Always start in the global #Lobby unless a private room invite link is
+    // opened. Private rooms use DevChat.html#room-<id>.
     const profileParam = new URLSearchParams(location.search).get("profile");
     const hash = (location.hash || "").replace("#", "");
     if (hash.startsWith("room-")) {
       privateRoomHash = hash.slice(5);
-    } else if (shouldOpenWorkspace() && hash !== LOBBY_HASH) {
+    } else if (!profileParam && hash !== LOBBY_HASH) {
       history.replaceState(null, "", lobbyUrl());
     }
     await detectApi();
@@ -162,6 +162,7 @@
     const publicHandle = safeProfileHandle(handle);
     if (!publicHandle) {
       $("landing").classList.add("is-hidden");
+      $("landingInfo").classList.add("is-hidden");
       $("workspace").classList.add("is-hidden");
       $("profilePage").classList.remove("is-hidden");
       $("profilePageTitle").textContent = "Profile";
@@ -175,6 +176,7 @@
       u.id === publicHandle || (u.phoneId && u.phoneId.replace("#", "") === publicHandle.replace("#", ""))
     );
     $("landing").classList.add("is-hidden");
+    $("landingInfo").classList.add("is-hidden");
     $("workspace").classList.add("is-hidden");
     $("profilePage").classList.remove("is-hidden");
 
@@ -933,7 +935,7 @@
 
   function shouldOpenWorkspace() {
     const params = new URLSearchParams(location.search);
-    return params.get("app") === "1" || !!privateRoomHash;
+    return params.get("app") === "1" || privateRoomHash;
   }
 
   function renderCallControls() {

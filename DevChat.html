@@ -7,9 +7,12 @@
   <meta name="description" content="DevChat connects developers and employers through live chat, posts, profiles, private rooms, and calls.">
   <link rel="preconnect" href="https://cdn.scaledrone.com">
   <link rel="preconnect" href="https://devchat.jintsu67.workers.dev">
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
   <script src="https://cdn.scaledrone.com/scaledrone.min.js" defer></script>
   <script>
+    if (!location.hash && !new URLSearchParams(location.search).has("profile")) {
+      history.replaceState(null, "", location.pathname + location.search + "#Lobby");
+    }
     window.DEVCHAT_CONFIG = window.DEVCHAT_CONFIG || {
       backend: "cloudflare",
       apiUrl: "https://devchat.jintsu67.workers.dev/api",
@@ -17,7 +20,7 @@
       // iceServers: [{ urls: "turn:turn.example.com:3478", username: "user", credential: "pass" }]
     };
   </script>
-  <script src="app.js?v=44" defer></script>
+  <script src="app.js?v=43" defer></script>
 </head>
 <body>
   <main class="shell" id="app">
@@ -39,6 +42,45 @@ loading lobby stream...
 link preview parser ready
 private room bridge online
 ad billboard armed</pre>
+      </div>
+    </section>
+
+    <section class="network-brief" id="landingInfo" aria-label="DevChat network overview">
+      <div class="brief-header">
+        <div class="devchat-mark" aria-label="DevChat logo space">DC</div>
+        <div>
+          <p class="signal">/network map</p>
+          <h2>Connect. Build. Hire. Live.</h2>
+        </div>
+        <button class="primary" data-open-auth="signup" type="button">Create Account</button>
+      </div>
+
+      <div class="brief-grid">
+        <article class="brief-block">
+          <span>01</span>
+          <h3>Live Lobby</h3>
+          <p>Developers and employers meet in a live public channel where posts, links, and usernames stay visible without exposing private emails.</p>
+        </article>
+        <article class="brief-block">
+          <span>02</span>
+          <h3>Private Messages</h3>
+          <p>Move quick conversations into direct PM threads, separate from lobby traffic and private video rooms.</p>
+        </article>
+        <article class="brief-block">
+          <span>03</span>
+          <h3>Developer Profiles</h3>
+          <p>Profiles show usernames, phone IDs, portfolio links, and posted work so employers can scan talent fast.</p>
+        </article>
+        <article class="brief-block">
+          <span>04</span>
+          <h3>Hiring and Jobseeking Posts</h3>
+          <p>Post availability, project needs, rates, and service offers in a shared feed built for repeated browsing.</p>
+        </article>
+        <article class="brief-block wide">
+          <span>05</span>
+          <h3>Private Rooms and Video Calls</h3>
+          <p>When a conversation needs focus, DevChat creates separate private rooms for chat, file sharing, and video calls backed by persistent Cloudflare data.</p>
+        </article>
       </div>
     </section>
 
