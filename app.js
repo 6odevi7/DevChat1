@@ -296,7 +296,7 @@
       $("authNote").textContent = "That username or email already exists on the server.";
       return;
     }
-    currentUser = saved.user || newUser;
+    currentUser = normalizeUser(saved.user || newUser);
     if (!state.users.find((u) => u.id === currentUser.id)) state.users.push(currentUser);
     state.currentUser = currentUser.id;
     saveLocalState();
@@ -319,7 +319,7 @@
     const remote = await api("login", { identity });
     let user = null;
     if (remote && remote.user) {
-      user = remote.user;
+      user = normalizeUser(remote.user);
       if (!state.users.find((u) => u.id === user.id)) state.users.push(user);
       saveLocalState();
     } else if (remote && remote.error === "not found") {
@@ -340,7 +340,7 @@
     $("authModal").close();
     renderAll();
     subscribePhoneChannel();
-    appendSystem(`${user.username} logged in.`);
+    appendSystem(`${safeUserName(user)} logged in.`);
   }
 
   function resetPassword() {
@@ -395,7 +395,7 @@
         sendRoom({ type: "room-chat", message: { ...message, mine: false } });
       } else {
         addMessage(message);
-        publishDrone({ type: "lobby-chat", userId: currentUser.id, username: safeDisplayName(currentUser), text, id: message.id });
+        publishDrone({ type: "lobby-chat", userId: currentUser.id, username: safeUserName(currentUser), text, id: message.id });
         await api("message", { message: { ...message, mine: false } });
       }
     });
@@ -982,11 +982,10 @@
   }
 
   function createChatMessage(text) {
-    const username = safeDisplayName(currentUser);
     return {
       id: cryptoId(),
       userId: currentUser.id,
-      username: username === "DevChat" && currentUser.username ? currentUser.username : username,
+      username: safeUserName(currentUser),
       text,
       createdAt: Date.now(),
       mine: true
@@ -1006,6 +1005,21 @@
     const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || ownUser && ownUser.username || source && (source.realName || source.phoneId) || "DevChat").trim();
     if (!raw || raw.includes("@")) return "DevChat";
     return raw;
+  }
+
+  function normalizeUser(user) {
+    if (!user || typeof user !== "object") return user;
+    const clean = { ...user };
+    clean.username = safeUserName(clean);
+    delete clean.email;
+    return clean;
+  }
+
+  function safeUserName(user) {
+    const raw = String(user && user.username || "").trim();
+    if (raw && !raw.includes("@") && raw !== "DevChat") return raw;
+    const fallback = String(user && (user.realName || user.phoneId) || "DevChat").trim();
+    return fallback && !fallback.includes("@") ? fallback : "DevChat";
   }
 
   function isValidEmail(value) {
@@ -1133,7 +1147,7 @@
       }
       apiAvailable = true;
       lastApiError = "";
-      if (Array.isArray(data.users)) state.users = mergeById(state.users, data.users);
+      if (Array.isArray(data.users)) state.users = mergeById(state.users, data.users.map(normalizeUser));
       if (Array.isArray(data.posts)) state.posts = mergeById(state.posts, data.posts);
       if (Array.isArray(data.messages)) state.messages = mergeById(state.messages, data.messages).slice(-200);
       if (data.seeded) state.seeded = true;

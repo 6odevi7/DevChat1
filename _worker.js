@@ -53,7 +53,7 @@ async function handleApi(request, env) {
   }
   if (!body || typeof body !== "object") body = {};
 
-  const KV = env.DEVCHAT_KV;
+  const KV = env.DEVCHAT_KV || env.devchat || env.DEVCHAT || env.KV;
 
   if (action === "health" || (method === "GET" && !action)) {
     return json({
@@ -88,12 +88,13 @@ async function handleApi(request, env) {
       if (!user || !user.username || !user.email) return json({ error: "missing fields" }, 400);
       if (!isValidEmail(user.email)) return json({ error: "invalid email" }, 400);
       const state = await loadState();
+      state.users = state.users.map(normalizeUser);
       const exists = state.users.some((u) =>
         (u.username || "").toLowerCase() === user.username.toLowerCase() ||
         (u.email || "").toLowerCase() === user.email.toLowerCase()
       );
       if (exists) return json({ error: "exists" }, 409);
-      state.users.push(user);
+      state.users.push(normalizeUser(user));
       await saveState(state);
       return json({ user: publicUser(user) });
     }
@@ -102,6 +103,7 @@ async function handleApi(request, env) {
       if (!identity) return json({ error: "missing email" }, 400);
       if (!isValidEmail(identity)) return json({ error: "email required" }, 400);
       const state = await loadState();
+      state.users = state.users.map(normalizeUser);
       const found = state.users.find((u) =>
         (u.email || "").toLowerCase() === identity
       );
@@ -112,6 +114,7 @@ async function handleApi(request, env) {
       const post = body.post;
       if (!post || !post.id) return json({ error: "missing post" }, 400);
       const state = await loadState();
+      state.users = state.users.map(normalizeUser);
       state.posts.unshift(post);
       state.posts = state.posts.slice(0, 500);
       await saveState(state);
@@ -129,6 +132,7 @@ async function handleApi(request, env) {
     case "clearMessages": {
       if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
       const state = await loadState();
+      state.users = state.users.map(normalizeUser);
       state.messages = [];
       await saveState(state);
       return json({ ok: true, cleared: "messages" });
@@ -136,6 +140,7 @@ async function handleApi(request, env) {
     case "repairMessages": {
       if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
       const state = await loadState();
+      state.users = state.users.map(normalizeUser);
       state.messages = Array.isArray(state.messages)
         ? state.messages.map((message) => sanitizeMessage(message, state)).filter(Boolean)
         : [];
@@ -170,8 +175,16 @@ function publicState(state) {
 
 function publicUser(user) {
   if (!user || typeof user !== "object") return null;
-  const { email, phone, ...safe } = user;
+  const { email, phone, ...safe } = normalizeUser(user);
   return safe;
+}
+
+function normalizeUser(user) {
+  if (!user || typeof user !== "object") return user;
+  const clean = { ...user };
+  clean.username = safeUserName(clean);
+  delete clean.email;
+  return clean;
 }
 
 function sanitizeMessage(message, state = emptyState()) {
@@ -189,6 +202,13 @@ function safeDisplayName(source, state = emptyState()) {
   const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || source && (source.realName || source.phoneId) || "DevChat").trim();
   if (!raw || raw.includes("@")) return "DevChat";
   return raw;
+}
+
+function safeUserName(user) {
+  const raw = String(user && user.username || "").trim();
+  if (raw && !raw.includes("@") && raw !== "DevChat") return raw;
+  const fallback = String(user && (user.realName || user.phoneId) || "DevChat").trim();
+  return fallback && !fallback.includes("@") ? fallback : "DevChat";
 }
 
 function isValidEmail(value) {
