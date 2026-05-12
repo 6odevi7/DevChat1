@@ -75,16 +75,26 @@
   </div>
   <script>
     const VAST_URL = "https://vast.yomeno.xyz/vast?spot_id=1490201";
-    const REFRESH_DELAY = 120000;
-    const SKIP_DELAY = 180000;
-    const ERROR_DELAY = 60000;
-    const MIN_RELOAD_GAP = 45000;
+    const REFRESH_DELAY = 10 * 60 * 1000;
+    const SKIP_DELAY = 15 * 60 * 1000;
+    const ERROR_DELAY = 5 * 60 * 1000;
+    const NO_FILL_DELAY = 5 * 60 * 1000;
+    const MIN_RELOAD_GAP = 5 * 60 * 1000;
+    const COOLDOWN_KEY = "devchat.ad.nextAllowedAt";
     const fallback = document.getElementById("fallback");
     let player = null;
     let reloadTimer = null;
     let lastReloadAt = 0;
+    let started = false;
 
     function buildPlayer() {
+      if (!canRequestAd()) {
+        fallback.style.display = "grid";
+        scheduleReload(timeUntilNextAd());
+        return;
+      }
+      started = true;
+      markNextAd(MIN_RELOAD_GAP);
       if (player) {
         try { player.destroy(); } catch (e) {}
         player = null;
@@ -134,7 +144,7 @@
             },
             noVastVideoCallback: () => {
               fallback.style.display = "grid";
-              scheduleReload(ERROR_DELAY);
+              scheduleReload(NO_FILL_DELAY);
             },
             vastVideoSkippedCallback: () => {
               scheduleReload(SKIP_DELAY);
@@ -147,14 +157,14 @@
       });
 
       player.on("play", () => { fallback.style.display = "none"; });
-      player.on("ended", () => { scheduleReload(REFRESH_DELAY); });
       player.on("error", () => { scheduleReload(ERROR_DELAY); });
     }
 
     function scheduleReload(delay) {
       if (reloadTimer) return;
       const elapsed = Date.now() - lastReloadAt;
-      const wait = Math.max(delay, MIN_RELOAD_GAP - elapsed);
+      const wait = Math.max(delay, MIN_RELOAD_GAP - elapsed, timeUntilNextAd());
+      markNextAd(wait);
       reloadTimer = setTimeout(() => {
         reloadTimer = null;
         reload();
@@ -167,10 +177,32 @@
       catch (e) { scheduleReload(ERROR_DELAY); }
     }
 
+    function canRequestAd() {
+      return Date.now() >= nextAllowedAt();
+    }
+
+    function nextAllowedAt() {
+      try { return Number(sessionStorage.getItem(COOLDOWN_KEY) || 0) || 0; }
+      catch (e) { return 0; }
+    }
+
+    function timeUntilNextAd() {
+      return Math.max(0, nextAllowedAt() - Date.now());
+    }
+
+    function markNextAd(delay) {
+      try { sessionStorage.setItem(COOLDOWN_KEY, String(Date.now() + Math.max(delay, MIN_RELOAD_GAP))); }
+      catch (e) {}
+    }
+
     window.addEventListener("message", (event) => {
       if (event.data === "clickVideo" && player) {
         try { player.play(); } catch (e) {}
       }
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && !started) scheduleReload(timeUntilNextAd());
     });
 
     if (typeof fluidPlayer === "function") {
