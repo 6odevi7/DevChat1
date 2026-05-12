@@ -104,10 +104,11 @@
   async function init() {
     // Always start in the global #Lobby unless a private room invite link is
     // opened. Private rooms use DevChat.html#room-<id>.
+    const profileParam = new URLSearchParams(location.search).get("profile");
     const hash = (location.hash || "").replace("#", "");
     if (hash.startsWith("room-")) {
       privateRoomHash = hash.slice(5);
-    } else if (hash !== LOBBY_HASH) {
+    } else if (!profileParam && hash !== LOBBY_HASH) {
       history.replaceState(null, "", lobbyUrl());
     }
     await detectApi();
@@ -137,8 +138,11 @@
     window.addEventListener("hashchange", onHashChange);
 
     // Public profile route: DevChat.html?profile=<username>
-    const profileParam = new URLSearchParams(location.search).get("profile");
-    if (profileParam) showProfilePage(profileParam);
+    if (profileParam) {
+      showProfilePage(profileParam);
+    } else if (hash === LOBBY_HASH || !privateRoomHash) {
+      showWorkspace();
+    }
   }
 
   function showProfilePage(handle) {
@@ -259,9 +263,14 @@
     // Entering DevChat always lands in #Lobby unless a private room invite link
     // is already active.
     if (!privateRoomHash) history.replaceState(null, "", lobbyUrl());
-    $("landing").classList.add("is-hidden");
-    $("workspace").classList.remove("is-hidden");
+    showWorkspace();
     renderAll();
+  }
+
+  function showWorkspace() {
+    $("landing").classList.add("is-hidden");
+    $("profilePage").classList.add("is-hidden");
+    $("workspace").classList.remove("is-hidden");
   }
 
   function openAuth(tab) {
@@ -896,7 +905,14 @@
   }
 
   function lobbyUrl() {
-    return pageUrl(location.search, `#${LOBBY_HASH}`);
+    return pageUrl(appSearch(), `#${LOBBY_HASH}`);
+  }
+
+  function appSearch() {
+    const params = new URLSearchParams(location.search);
+    params.delete("profile");
+    const query = params.toString();
+    return query ? `?${query}` : "";
   }
 
   function renderCallControls() {

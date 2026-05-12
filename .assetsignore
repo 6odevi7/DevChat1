@@ -1,13 +1,16 @@
 node_modules
 .git
 .wrangler
+.wrangler-config
 functions
 api.php
 .htaccess
 *.zip
 *.ps1
 *.md
+*.log
 package-lock.json
+wrangler.toml
 wrangler.toml.example
 _worker.js
 _routes.json
