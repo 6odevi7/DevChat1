@@ -10,9 +10,6 @@
   <link rel="stylesheet" href="styles.css?v=4">
   <script src="https://cdn.scaledrone.com/scaledrone.min.js" defer></script>
   <script>
-    if (!location.hash && !new URLSearchParams(location.search).has("profile")) {
-      history.replaceState(null, "", location.pathname + location.search + "#Lobby");
-    }
     window.DEVCHAT_CONFIG = window.DEVCHAT_CONFIG || {
       backend: "cloudflare",
       apiUrl: "https://devchat.jintsu67.workers.dev/api",
@@ -20,7 +17,7 @@
       // iceServers: [{ urls: "turn:turn.example.com:3478", username: "user", credential: "pass" }]
     };
   </script>
-  <script src="app.js?v=42" defer></script>
+  <script src="app.js?v=44" defer></script>
 </head>
 <body>
   <main class="shell" id="app">
@@ -52,7 +49,7 @@ ad billboard armed</pre>
           <h2 id="profilePageTitle">DevChat profile</h2>
         </div>
         <div class="session-card">
-          <a class="tiny ghost" href="DevChat.html#Lobby">← Back to DevChat</a>
+          <a class="tiny ghost" href="DevChat.html?app=1#Lobby">← Back to DevChat</a>
         </div>
       </header>
       <section class="profile-grid">
