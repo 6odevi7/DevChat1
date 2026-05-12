@@ -132,18 +132,28 @@
 
   function showProfilePage(handle) {
     const lower = String(handle).toLowerCase();
+    const publicHandle = safeProfileHandle(handle);
+    if (!publicHandle) {
+      $("landing").classList.add("is-hidden");
+      $("workspace").classList.add("is-hidden");
+      $("profilePage").classList.remove("is-hidden");
+      $("profilePageTitle").textContent = "Profile";
+      $("profileSummary").innerHTML = `<div class="profile-empty">No public DevChat profile found for that link.</div>`;
+      $("profilePosts").innerHTML = "";
+      return;
+    }
     const user = state.users.find((u) =>
-      u.username && u.username.toLowerCase() === lower
+      safeUserName(u).toLowerCase() === publicHandle.toLowerCase()
     ) || state.users.find((u) =>
-      u.id === handle || (u.phoneId && u.phoneId.replace("#", "") === handle.replace("#", ""))
+      u.id === publicHandle || (u.phoneId && u.phoneId.replace("#", "") === publicHandle.replace("#", ""))
     );
     $("landing").classList.add("is-hidden");
     $("workspace").classList.add("is-hidden");
     $("profilePage").classList.remove("is-hidden");
 
     if (!user) {
-      $("profilePageTitle").textContent = `Profile: ${handle}`;
-      $("profileSummary").innerHTML = `<div class="profile-empty">No DevChat profile found for <b>${escapeHtml(handle)}</b>. The user may not have signed up yet, or this profile lives on another DevChat instance.</div>`;
+      $("profilePageTitle").textContent = `Profile: ${publicHandle}`;
+      $("profileSummary").innerHTML = `<div class="profile-empty">No DevChat profile found for <b>${escapeHtml(publicHandle)}</b>. The user may not have signed up yet, or this profile lives on another DevChat instance.</div>`;
       $("profilePosts").innerHTML = "";
       return;
     }
@@ -279,6 +289,7 @@
     const newUser = {
       id: cryptoId(),
       username,
+      handle: username,
       realName,
       email,
       phone,
@@ -1016,10 +1027,16 @@
   }
 
   function safeUserName(user) {
-    const raw = String(user && user.username || "").trim();
+    const raw = String(user && (user.handle || user.username) || "").trim();
     if (raw && !raw.includes("@") && raw !== "DevChat") return raw;
     const fallback = String(user && (user.realName || user.phoneId) || "DevChat").trim();
     return fallback && !fallback.includes("@") ? fallback : "DevChat";
+  }
+
+  function safeProfileHandle(handle) {
+    const raw = String(handle || "").trim();
+    if (!raw || raw.includes("@")) return "";
+    return raw;
   }
 
   function isValidEmail(value) {

@@ -87,6 +87,7 @@ async function handleApi(request, env) {
       const user = body.user;
       if (!user || !user.username || !user.email) return json({ error: "missing fields" }, 400);
       if (!isValidEmail(user.email)) return json({ error: "invalid email" }, 400);
+      user.handle = user.handle || user.username;
       const state = await loadState();
       state.users = state.users.map(normalizeUser);
       const exists = state.users.some((u) =>
@@ -147,6 +148,23 @@ async function handleApi(request, env) {
       await saveState(state);
       return json({ ok: true, messages: state.messages.length });
     }
+    case "setHandle": {
+      if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
+      const email = String(url.searchParams.get("email") || body.email || "").trim().toLowerCase();
+      const handle = String(url.searchParams.get("handle") || body.handle || "").trim();
+      if (!isValidEmail(email) || !handle || handle.includes("@")) return json({ error: "invalid handle update" }, 400);
+      const state = await loadState();
+      const user = state.users.find((item) => String(item.email || "").trim().toLowerCase() === email);
+      if (!user) return json({ error: "not found" }, 404);
+      user.handle = handle;
+      user.username = handle;
+      state.users = state.users.map(normalizeUser);
+      state.messages = Array.isArray(state.messages)
+        ? state.messages.map((message) => sanitizeMessage(message, state)).filter(Boolean)
+        : [];
+      await saveState(state);
+      return json({ ok: true, user: publicUser(user) });
+    }
     case "seed": {
       const seed = body.state;
       if (!seed) return json({ error: "missing state" }, 400);
@@ -182,6 +200,7 @@ function publicUser(user) {
 function normalizeUser(user) {
   if (!user || typeof user !== "object") return user;
   const clean = { ...user };
+  if (!clean.handle && clean.username && !String(clean.username).includes("@")) clean.handle = clean.username;
   clean.username = safeUserName(clean);
   delete clean.email;
   return clean;
@@ -205,7 +224,7 @@ function safeDisplayName(source, state = emptyState()) {
 }
 
 function safeUserName(user) {
-  const raw = String(user && user.username || "").trim();
+  const raw = String(user && (user.handle || user.username) || "").trim();
   if (raw && !raw.includes("@") && raw !== "DevChat") return raw;
   const fallback = String(user && (user.realName || user.phoneId) || "DevChat").trim();
   return fallback && !fallback.includes("@") ? fallback : "DevChat";
