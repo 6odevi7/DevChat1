@@ -251,6 +251,7 @@
 
   function openAuth(tab) {
     switchAuth(tab);
+    if (tab === "signup") clearSignupForm();
     $("authNote").textContent = apiAvailable
       ? `Backend connected: ${apiHostLabel(API_URL)}`
       : `Backend offline: ${lastApiError || "checking..."}`;
@@ -1022,6 +1023,8 @@
     if (!user || typeof user !== "object") return user;
     const clean = { ...user };
     clean.username = safeUserName(clean);
+    clean.handle = clean.username;
+    clean.profileUrl = pageUrl(`?profile=${encodeURIComponent(clean.username)}`);
     delete clean.email;
     return clean;
   }
@@ -1041,6 +1044,13 @@
 
   function isValidEmail(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+  }
+
+  function clearSignupForm() {
+    ["signupUsername", "signupRealName", "signupEmail", "signupPhone"].forEach((id) => {
+      const input = $(id);
+      if (input) input.value = "";
+    });
   }
 
   function renderProfile() {

@@ -20,7 +20,7 @@
       // iceServers: [{ urls: "turn:turn.example.com:3478", username: "user", credential: "pass" }]
     };
   </script>
-  <script src="app.js?v=33" defer></script>
+  <script src="app.js?v=34" defer></script>
 </head>
 <body>
   <main class="shell" id="app">
@@ -180,10 +180,10 @@ ad billboard armed</pre>
         <button data-auth-tab="reset" type="button">Reset</button>
       </div>
       <div class="auth-pane" id="signupPane">
-        <input id="signupUsername" placeholder="Username" autocomplete="username">
-        <input id="signupRealName" placeholder="Real name" autocomplete="name">
-        <input id="signupEmail" placeholder="Email" autocomplete="email">
-        <input id="signupPhone" placeholder="Best phone number" autocomplete="tel">
+        <input id="signupUsername" placeholder="Username" autocomplete="off">
+        <input id="signupRealName" placeholder="Real name" autocomplete="off">
+        <input id="signupEmail" type="email" placeholder="Email" autocomplete="off">
+        <input id="signupPhone" placeholder="Best phone number" autocomplete="off">
         <button class="primary stretch" id="signupButton" type="button">Create DevChat ID</button>
       </div>
       <div class="auth-pane is-hidden" id="loginPane">

@@ -186,6 +186,8 @@ function normalizeUser(user) {
   const clean = { ...user };
   if (!clean.handle && clean.username && !String(clean.username).includes("@")) clean.handle = clean.username;
   clean.username = safeUserName(clean);
+  clean.handle = clean.username;
+  clean.profileUrl = `?profile=${encodeURIComponent(clean.username)}`;
   delete clean.email;
   return clean;
 }
