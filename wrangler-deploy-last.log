@@ -2,16 +2,14 @@
  Γ¢à∩╕Å wrangler 4.90.0
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 ≡ƒîÇ Building list of assets...
-Γ£¿ Read 4101 files from the assets directory C:\Users\Jintsu\Desktop\livestream\loom-hostinger\sites\DevChat
+Γ£¿ Read 4117 files from the assets directory C:\Users\Jintsu\Desktop\livestream\loom-hostinger\sites\DevChat
 ≡ƒîÇ Starting asset upload...
-≡ƒîÇ Found 3 new or modified static assets to upload. Proceeding with upload...
+≡ƒîÇ Found 2 new or modified static assets to upload. Proceeding with upload...
 + /ad-player.html
 + /DevChat.html
-+ /app.js
-Uploaded 1 of 3 assets
-Uploaded 2 of 3 assets
-Uploaded 3 of 3 assets
-Γ£¿ Success! Uploaded 3 files (9 already uploaded) (1.25 sec)
+Uploaded 1 of 2 assets
+Uploaded 2 of 2 assets
+Γ£¿ Success! Uploaded 2 files (10 already uploaded) (1.03 sec)
 
 Total Upload: 12.76 KiB / gzip: 3.24 KiB
 Your Worker has access to the following bindings:
@@ -19,7 +17,7 @@ Binding                                                Resource
 env.DEVCHAT_KV (700ef8ab3c9a47d9ac3a99629995d899)      KV Namespace      
 env.ASSETS                                             Assets            
 
-Uploaded devchat (8.14 sec)
-Deployed devchat triggers (0.79 sec)
+Uploaded devchat (6.28 sec)
+Deployed devchat triggers (0.78 sec)
   https://devchat.jintsu67.workers.dev
-Current Version ID: 25940989-2daf-4a67-be73-3bbc4d50ce3d
+Current Version ID: b19bea1f-8a4d-4b94-9eb0-5cffbfe3396a
