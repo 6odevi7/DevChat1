@@ -70,6 +70,10 @@
     return `${location.origin}${location.pathname}${query}${hash}`;
   }
 
+  function workspaceUrl() {
+    return pageUrl("?app=1", `#${LOBBY_HASH}`);
+  }
+
   function isCloudflareHost() {
     return /\.pages\.dev$/i.test(location.hostname) || DEVCHAT_CONFIG.backend === "cloudflare";
   }
@@ -109,13 +113,13 @@
   document.addEventListener("DOMContentLoaded", init);
 
   async function init() {
-    // Always start in the global #Lobby unless a private room invite link is
-    // opened. Private rooms use DevChat.html#room-<id>.
+    // First visits stay on the landing page. The workspace opens only from the
+    // Enter DevChat path (?app=1#Lobby) or a private room invite.
     const profileParam = new URLSearchParams(location.search).get("profile");
     const hash = (location.hash || "").replace("#", "");
     if (hash.startsWith("room-")) {
       privateRoomHash = hash.slice(5);
-    } else if (!profileParam && hash !== LOBBY_HASH) {
+    } else if (shouldOpenWorkspace() && hash !== LOBBY_HASH) {
       history.replaceState(null, "", lobbyUrl());
     }
     await detectApi();
@@ -148,7 +152,7 @@
     // Public profile route: DevChat.html?profile=<username>
     if (profileParam) {
       showProfilePage(profileParam);
-    } else if (hash === LOBBY_HASH || !privateRoomHash) {
+    } else if (shouldOpenWorkspace()) {
       showWorkspace();
     }
   }
@@ -270,13 +274,14 @@
   function enterWorkspace() {
     // Entering DevChat always lands in #Lobby unless a private room invite link
     // is already active.
-    if (!privateRoomHash) history.replaceState(null, "", lobbyUrl());
+    if (!privateRoomHash) history.replaceState(null, "", workspaceUrl());
     showWorkspace();
     renderAll();
   }
 
   function showWorkspace() {
     $("landing").classList.add("is-hidden");
+    $("landingInfo").classList.add("is-hidden");
     $("profilePage").classList.add("is-hidden");
     $("workspace").classList.remove("is-hidden");
   }
@@ -921,8 +926,14 @@
   function appSearch() {
     const params = new URLSearchParams(location.search);
     params.delete("profile");
+    params.set("app", "1");
     const query = params.toString();
     return query ? `?${query}` : "";
+  }
+
+  function shouldOpenWorkspace() {
+    const params = new URLSearchParams(location.search);
+    return params.get("app") === "1" || !!privateRoomHash;
   }
 
   function renderCallControls() {
