@@ -393,6 +393,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--acid); }
 .widget-tabs button, .auth-tabs button { flex: 1; }
 .widget-tabs .active, .auth-tabs .active { color: #03120a; background: var(--cyan); border-color: var(--cyan); font-weight: 800; }
 .widget-body { flex: 1; overflow: auto; padding: 12px; }
+.widget-messages { display: grid; gap: 8px; margin-bottom: 10px; }
+.widget-composer { display: flex; gap: 8px; position: sticky; bottom: 0; padding-top: 8px; background: rgba(11,18,16,.97); }
+.widget-composer input { min-width: 0; flex: 1; }
+.widget-composer button { min-width: 72px; }
 
 .ad-billboard {
   position: fixed;

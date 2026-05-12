@@ -408,20 +408,35 @@
       const input = $("messageInput");
       const text = input.value.trim();
       if (!text) return;
-      const message = createChatMessage(text);
       input.value = "";
-      if (chatMode === "pm") {
-        if (!pmTargetId) { appendSystem("Select a user for PM first."); return; }
-        addPmMessage(message);
-        await api("pmSend", { message: { ...message, toUserId: pmTargetId, mine: false } });
-      } else if (isPrivateChatActive()) {
-        addRoomMessage(message);
-        sendRoom({ type: "room-chat", message: { ...message, mine: false } });
-      } else {
-        addMessage(message);
-        publishDrone({ type: "lobby-chat", userId: currentUser.id, username: safeUserName(currentUser), text, id: message.id });
-        await api("message", { message: { ...message, mine: false } });
-      }
+      await sendTextMessage(text);
+    });
+  }
+
+  async function sendTextMessage(text) {
+    const message = createChatMessage(text);
+    if (chatMode === "pm") {
+      if (!pmTargetId) { appendSystem("Select a user for PM first."); return; }
+      addPmMessage(message);
+      await api("pmSend", { message: { ...message, toUserId: pmTargetId, mine: false } });
+    } else if (isPrivateChatActive()) {
+      addRoomMessage(message);
+      sendRoom({ type: "room-chat", message: { ...message, mine: false } });
+    } else {
+      addMessage(message);
+      publishDrone({ type: "lobby-chat", userId: currentUser.id, username: safeUserName(currentUser), text, id: message.id });
+      await api("message", { message: { ...message, mine: false } });
+    }
+  }
+
+  function sendWidgetMessage() {
+    guardAuthed(async () => {
+      const input = $("widgetMessageInput");
+      if (!input) return;
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      await sendTextMessage(text);
     });
   }
 
@@ -636,7 +651,10 @@
 
   function startCall() {
     if (!callRole) callRole = "caller";
-    ensurePrivateRoom();
+    if (!privateRoomHash) {
+      appendSystem("Calls cannot start from Lobby. Use a phone ID or copied private room first.");
+      return;
+    }
     if (!privateSub) {
       appendSystem("Private room is still connecting. Try again in a moment.");
       return;
@@ -703,7 +721,7 @@
       appendSystem("Returned to Lobby.");
       return;
     }
-    startCall();
+    appendSystem("Calls cannot start from Lobby. Use a phone ID or copied private room first.");
   }
 
   async function getLocalMedia() {
@@ -942,11 +960,20 @@
   }
 
   function copyRoom() {
-    ensurePrivateRoom();
+    createPrivateRoom();
+    if (!privateRoomHash) return;
     copyText(location.href).then(
       () => appendSystem("Private room URL copied."),
       () => appendSystem(`Private room URL: ${location.href}`)
     );
+  }
+
+  function createPrivateRoom() {
+    guardAuthed(() => {
+      ensurePrivateRoom();
+      appendSystem("Private room created. Calls are only available in this room or a phone-call room.");
+      renderAll();
+    });
   }
 
   function renderAll() {
@@ -1144,22 +1171,48 @@
         .filter((user) => currentUser && user.id !== currentUser.id)
         .map((user) => `<button class="tiny ghost stretch" data-widget-pm="${escapeHtml(user.id)}" type="button">${escapeHtml(safeUserName(user))}</button>`)
         .join("");
-      $("widgetBody").innerHTML = `<div class="auth-pane">${targets || `<p class="modal-note">Login and sync users to send PMs.</p>`}</div>`;
+      $("widgetBody").innerHTML = `<div class="auth-pane">${targets || `<p class="modal-note">Login and sync users to send PMs.</p>`}</div>${chatMode === "pm" ? widgetChatHtml() : ""}`;
       $("widgetBody").querySelectorAll("[data-widget-pm]").forEach((button) => {
         button.addEventListener("click", () => {
           setChatMode("pm");
           setPmTarget(button.dataset.widgetPm);
+          renderWidget("pm");
         });
       });
+      bindWidgetComposer();
     } else if (tab === "room") {
       const label = privateRoomHash ? `Private room ${escapeHtml(privateRoomHash)}` : `#${LOBBY_HASH}`;
-      $("widgetBody").innerHTML = `<p class="modal-note">${label} is ready.</p><button class="primary stretch" data-widget-start-call type="button">Start Call</button><p class="modal-note">${escapeHtml(privateRoomHash ? location.href : lobbyUrl())}</p>`;
+      $("widgetBody").innerHTML = `<p class="modal-note">${label} is ready.</p><button class="primary stretch" data-widget-create-room type="button">Create Private Room</button><button class="primary stretch" data-widget-start-call type="button">Start Call</button><p class="modal-note">${escapeHtml(privateRoomHash ? location.href : lobbyUrl())}</p>${isPrivateChatActive() ? widgetChatHtml() : ""}`;
+      const createButton = $("widgetBody").querySelector("[data-widget-create-room]");
+      createButton.addEventListener("click", createPrivateRoom);
       const button = $("widgetBody").querySelector("[data-widget-start-call]");
       button.textContent = (pc || privateRoomHash) ? "End Call" : "Start Call";
       button.addEventListener("click", () => guardAuthed(toggleCall));
+      bindWidgetComposer();
     } else {
-      $("widgetBody").innerHTML = activeMessages().slice(-8).map(renderMessage).join("");
+      $("widgetBody").innerHTML = widgetChatHtml();
+      bindWidgetComposer();
     }
+  }
+
+  function widgetChatHtml() {
+    const label = chatMode === "pm" ? "PM" : isPrivateChatActive() ? "Private room" : "Lobby";
+    return `
+      <div class="widget-messages">${activeMessages().slice(-8).map(renderMessage).join("") || `<p class="modal-note">No ${escapeHtml(label)} messages yet.</p>`}</div>
+      <div class="widget-composer">
+        <input id="widgetMessageInput" placeholder="${escapeHtml(currentUser ? `Message ${label}` : "Login to send")}">
+        <button class="primary" id="widgetSendMessage" type="button">Send</button>
+      </div>
+    `;
+  }
+
+  function bindWidgetComposer() {
+    const input = $("widgetMessageInput");
+    const button = $("widgetSendMessage");
+    if (button) button.addEventListener("click", sendWidgetMessage);
+    if (input) input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") sendWidgetMessage();
+    });
   }
 
   function openLinkModal(url) {
