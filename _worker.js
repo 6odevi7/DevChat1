@@ -166,6 +166,16 @@ async function handleApi(request, env) {
       await saveState(state);
       return json({ ok: true, cleared: "messages" });
     }
+    case "clearUsers": {
+      if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
+      const state = emptyState();
+      await saveState(state);
+      return json({
+        ok: true,
+        cleared: ["users", "posts", "messages", "privateMessages"],
+        state: publicState(state)
+      });
+    }
     case "repairMessages": {
       if (!isAdminRequest(url, env)) return json({ error: "unauthorized" }, 401);
       const state = await loadState();
@@ -222,7 +232,7 @@ function publicState(state) {
 
 function publicUser(user) {
   if (!user || typeof user !== "object") return null;
-  const { email, phone, ...safe } = normalizeUser(user);
+  const { email, phone, realName, ...safe } = normalizeUser(user);
   return safe;
 }
 
@@ -233,7 +243,6 @@ function normalizeUser(user) {
   clean.username = safeUserName(clean);
   clean.handle = clean.username;
   clean.profileUrl = `?profile=${encodeURIComponent(clean.username)}`;
-  delete clean.email;
   return clean;
 }
 
@@ -249,7 +258,7 @@ function safeDisplayName(source, state = emptyState()) {
   const byId = source && source.userId && Array.isArray(state.users)
     ? state.users.find((user) => user.id === source.userId)
     : null;
-  const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || source && (source.realName || source.phoneId) || "DevChat").trim();
+  const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || source && source.phoneId || "DevChat").trim();
   if (!raw || raw.includes("@")) return "DevChat";
   return raw;
 }
@@ -257,7 +266,7 @@ function safeDisplayName(source, state = emptyState()) {
 function safeUserName(user) {
   const raw = String(user && (user.handle || user.username) || "").trim();
   if (raw && !raw.includes("@") && raw !== "DevChat") return raw;
-  const fallback = String(user && (user.realName || user.phoneId) || "DevChat").trim();
+  const fallback = String(user && user.phoneId || "DevChat").trim();
   return fallback && !fallback.includes("@") ? fallback : "DevChat";
 }
 

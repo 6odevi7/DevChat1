@@ -1108,7 +1108,7 @@
   function safeDisplayName(source) {
     const byId = source && source.userId && state.users.find((user) => user.id === source.userId);
     const ownUser = currentUser && source && source.userId === currentUser.id ? currentUser : null;
-    const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || ownUser && ownUser.username || source && (source.realName || source.phoneId) || "DevChat").trim();
+    const raw = String(source && source.username && source.username !== "DevChat" ? source.username : byId && byId.username || ownUser && ownUser.username || source && source.phoneId || "DevChat").trim();
     if (!raw || raw.includes("@")) return "DevChat";
     return raw;
   }
@@ -1126,7 +1126,7 @@
   function safeUserName(user) {
     const raw = String(user && (user.handle || user.username) || "").trim();
     if (raw && !raw.includes("@") && raw !== "DevChat") return raw;
-    const fallback = String(user && (user.realName || user.phoneId) || "DevChat").trim();
+    const fallback = String(user && user.phoneId || "DevChat").trim();
     return fallback && !fallback.includes("@") ? fallback : "DevChat";
   }
 
@@ -1479,7 +1479,6 @@
         id: safe.id,
         username: safe.username,
         handle: safe.handle,
-        realName: safe.realName,
         phoneId: safe.phoneId,
         profileUrl: safe.profileUrl,
         socials: safe.socials || [],
