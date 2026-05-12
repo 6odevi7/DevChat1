@@ -10,6 +10,5 @@ run_worker_first = true
 
 [[kv_namespaces]]
 binding = "DEVCHAT_KV"
-id = "b8f46354-23cb-4ab2-8574-f47306053c64"
-
+id = "700ef8ab3c9a47d9ac3a99629995d899"
 
